@@ -1,10 +1,12 @@
 """Run the Phase 0 extraction pipeline over the sample pages (tasks P0-6, P0-7).
 
 Usage:
-    python run_spike.py --extract-model nuextract3:q4_k_m --gen-model qwen3.5:4b
+    python run_spike.py --extract-model numind/nuextract3:q4_k_m --gen-model qwen3.5:4b
 
-Writes one JSON result per page into spike/out/, then prints a latency table. The verdict
-itself comes from verify.py plus your own reading of the hypotheses.
+Extraction goes to NuExtract3 via its template protocol; hypothesis generation goes to a
+general instruct model via schema-constrained JSON. Writes one JSON result per page into
+spike/out/, then prints a latency table. The verdict itself comes from verify.py plus your
+own reading of the hypotheses.
 """
 
 import argparse
@@ -13,7 +15,7 @@ import sys
 from pathlib import Path
 
 import prompts
-from ollama_client import available_models, call
+from ollama_client import available_models, call_nuextract, call_schema, is_installed
 from schemas import CompanyFacts, OpportunityList, SignalList
 
 SPIKE = Path(__file__).parent
@@ -21,27 +23,50 @@ PAGES = SPIKE / "pages"
 OUT = SPIKE / "out"
 
 
+def extract(model: str, meta: dict, text: str, output_model, *, task: str):
+    """Route an extraction task to whichever protocol the chosen model speaks.
+
+    Keeping both paths available means a NuExtract-vs-general-model comparison is a flag
+    change rather than a rewrite, which matters if the spike verdict is borderline.
+    """
+    if "nuextract" in model:
+        instructions = (
+            prompts.EXTRACT_FACTS_INSTRUCTIONS
+            if task == "facts"
+            else prompts.EXTRACT_SIGNALS_INSTRUCTIONS
+        )
+        return call_nuextract(
+            model=model,
+            document=text,
+            output_model=output_model,
+            prompt_version=prompts.PROMPT_VERSION,
+            instructions=instructions,
+        )
+
+    system = prompts.EXTRACT_FACTS_SYSTEM if task == "facts" else prompts.EXTRACT_SIGNALS_SYSTEM
+    user = (
+        prompts.facts_user_prompt(meta["url"], text)
+        if task == "facts"
+        else prompts.signals_user_prompt(meta["url"], text)
+    )
+    return call_schema(
+        model=model,
+        system=system,
+        user=user,
+        output_model=output_model,
+        prompt_version=prompts.PROMPT_VERSION,
+    )
+
+
 def run_page(meta: dict, text: str, extract_model: str, gen_model: str) -> dict:
     print(f"\n=== {meta['slug']}  ({meta['text_chars']} chars, label={meta['label']})")
 
     print("  facts...", end="", flush=True)
-    facts = call(
-        model=extract_model,
-        system=prompts.EXTRACT_FACTS_SYSTEM,
-        user=prompts.facts_user_prompt(meta["url"], text),
-        output_model=CompanyFacts,
-        prompt_version=prompts.PROMPT_VERSION,
-    )
+    facts = extract(extract_model, meta, text, CompanyFacts, task="facts")
     print(f" {facts.seconds:.1f}s ok={facts.ok} attempts={facts.attempts}")
 
     print("  signals...", end="", flush=True)
-    signals = call(
-        model=extract_model,
-        system=prompts.EXTRACT_SIGNALS_SYSTEM,
-        user=prompts.signals_user_prompt(meta["url"], text),
-        output_model=SignalList,
-        prompt_version=prompts.PROMPT_VERSION,
-    )
+    signals = extract(extract_model, meta, text, SignalList, task="signals")
     n = len(signals.parsed.signals) if signals.parsed else 0
     print(f" {signals.seconds:.1f}s ok={signals.ok} signals={n}")
 
@@ -71,7 +96,7 @@ def run_page(meta: dict, text: str, extract_model: str, gen_model: str) -> dict:
     # what spec section 7.2 forbids.
     if signals.ok and signals.parsed and signals.parsed.signals and facts.parsed:
         print("  opportunities...", end="", flush=True)
-        opps = call(
+        opps = call_schema(
             model=gen_model,
             system=prompts.GENERATE_OPPORTUNITIES_SYSTEM,
             user=prompts.opportunities_user_prompt(
@@ -99,7 +124,7 @@ def run_page(meta: dict, text: str, extract_model: str, gen_model: str) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--extract-model", default="nuextract3:q4_k_m")
+    parser.add_argument("--extract-model", default="numind/nuextract3:q4_k_m")
     parser.add_argument("--gen-model", default="qwen3.5:4b")
     parser.add_argument("--only", help="Run a single page by slug substring.")
     args = parser.parse_args()
@@ -111,7 +136,7 @@ def main() -> int:
         return 1
 
     for model in (args.extract_model, args.gen_model):
-        if model not in installed:
+        if not is_installed(model, installed):
             print(f"Model not installed: {model}\nInstalled: {installed or '(none)'}")
             return 1
 

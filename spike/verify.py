@@ -57,6 +57,7 @@ def main() -> int:
     evidence_failures: list[dict] = []
     label_checks: list[tuple[str, str, bool, str]] = []
     uncited_opportunities: list[str] = []
+    negative_only_opportunities: list[str] = []
     numeric_claims: list[tuple[str, str]] = []
     latencies: list[float] = []
     review: list[dict] = []
@@ -109,6 +110,16 @@ def main() -> int:
             indexes = opp.get("supporting_signal_indexes") or []
             if not indexes or any(i < 0 or i >= len(signals) for i in indexes):
                 uncited_opportunities.append(f"{slug}: {opp['title']} -> {indexes}")
+            else:
+                # An opportunity resting only on negative_weak evidence -- typically a
+                # hiring page -- is the spec's primary failure mode: drifting from project
+                # work into job hunting. Prompting alone does not reliably prevent it, so
+                # this stays a deterministic check (spec section 15.2).
+                cited = [signals[i]["type"] for i in indexes]
+                if cited and all(t == "negative_weak" for t in cited):
+                    negative_only_opportunities.append(
+                        f"{slug}: {opp['title']} -> cites only {cited}"
+                    )
             # Invented numbers are forbidden by spec section 7.1; flag for human reading
             # rather than failing, since a figure quoted from the page is legitimate.
             if re.search(r"\d+\s*(%|percent|x\b|hours|days|weeks)", opp.get("business_outcome", "")):
@@ -137,6 +148,8 @@ def main() -> int:
         line("Dud / recruiter pages rejected", "no labelled pages", None)
     line("Opportunities cite valid signals", f"{len(uncited_opportunities)} violations",
          not uncited_opportunities)
+    line("No opportunity built only on negative evidence",
+         f"{len(negative_only_opportunities)} violations", not negative_only_opportunities)
 
     if latencies:
         worst = max(latencies)
@@ -162,6 +175,11 @@ def main() -> int:
     if uncited_opportunities:
         print("\nOPPORTUNITIES WITH BAD CITATIONS")
         for item in uncited_opportunities:
+            print(f"  {item}")
+
+    if negative_only_opportunities:
+        print("\nOPPORTUNITIES BUILT ON NEGATIVE EVIDENCE (job-hunting drift)")
+        for item in negative_only_opportunities:
             print(f"  {item}")
 
     if numeric_claims:

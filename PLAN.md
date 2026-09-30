@@ -32,18 +32,19 @@ inside an HTTP request. All model work runs as background jobs, and the snapshot
 Goal: find out whether a CPU-only local model can produce signals and hypotheses worth acting on.
 If it can't, the product needs rethinking, and that is much cheaper to learn now.
 
-- [ ] **P0-1** Install Ollama; confirm it serves on `127.0.0.1:11434`.
-- [ ] **P0-2** Pull `nuextract3:q4_k_m` (~3.4 GB, Apache-2.0) as the extraction model.
-- [ ] **P0-3** Pull one general instruct model for generation/drafting. Try a 4B first given
-      CPU-only; escalate to ~9B only if 4B output quality is unusable.
+- [x] **P0-1** Install Ollama; confirm it serves on `127.0.0.1:11434`.
+- [x] **P0-2** Pull `numind/nuextract3:q4_k_m` (3.4 GB, Apache-2.0) as the extraction model.
+      The namespace is required; bare `nuextract3:q4_k_m` does not resolve.
+- [x] **P0-3** Pull one general instruct model for generation/drafting: `qwen3.5:4b` (3.4 GB).
+      Escalate to ~9B only if 4B output quality proves unusable.
 - [ ] **P0-4** Save 8-10 real company pages to `spike/pages/` by hand — mix of homepages, about
       pages, blog/news posts, product announcements. Include at least one dud (vague corporate
       site with no signal) and one recruiter/staffing site, which must be correctly rejected.
-- [ ] **P0-5** Write draft JSON schemas for `extract_company_facts` and `extract_signals`.
+- [x] **P0-5** Write draft JSON schemas for `extract_company_facts` and `extract_signals`.
       Every signal object must carry a verbatim `evidence_excerpt` copied from the source.
-- [ ] **P0-6** Run extraction via Ollama's strict `format: json_schema` mode with
-      `temperature: 0` and `think: false`. Record wall-clock time per page.
-- [ ] **P0-7** Draft `generate_opportunities` prompt; run it on the extracted signals.
+- [x] **P0-6** Run extraction through NuExtract3's template protocol with `temperature: 0`
+      and `think: false`. Record wall-clock time per page.
+- [x] **P0-7** Draft `generate_opportunities` prompt; run it on the extracted signals.
 - [ ] **P0-8** Score results against the rubric below and write the verdict into `DECISIONS.md`.
 
 ### P0 pass/fail rubric
@@ -58,7 +59,23 @@ Judge each of the 10 pages manually:
 | Signals are real observations, not industry platitudes | ≥7/10 |
 | At least one hypothesis you'd personally act on, for pages that warrant it | ≥5/10 |
 | Dud and recruiter pages produce no signals / negative signal | 2/2 |
+| No opportunity built only on `negative_weak` evidence | zero violations |
 | Extraction latency per page | note it; >120s forces design changes |
+
+### Smoke-test findings (synthetic page, before real URLs)
+
+Both protocols work end to end on first attempt, with all evidence excerpts verbatim and a
+hiring mention correctly classed `negative_weak`.
+
+Measured on CPU: facts ~48s, signals ~48s, hypotheses ~130s, so roughly **4 minutes per
+page**. Above the 120s guideline, which confirms rather than contradicts the architecture —
+LLM work must be background-only, and the snapshot-hash skip is what makes the ongoing cost
+bearable. Revisit only if a full refresh cycle stops fitting in its window.
+
+The generation model produced a third hypothesis resting solely on the hiring signal —
+precisely the job-hunting drift the spec forbids. Fixed in the prompt *and* as a
+deterministic check in `verify.py`, since prompting alone cannot be trusted with a rule
+this important (spec §15.2).
 
 **Go:** rubric passes → proceed to Phase 1 with model choices locked.
 **Conditional:** facts fine but hypotheses weak → proceed, but treat hypothesis generation as
@@ -307,3 +324,7 @@ Record as we go, with reasoning. Seeded with what's already settled:
 | D-06 | Two models: NuExtract3 for extraction, general instruct for generation | Different jobs; both Apache-2.0 |
 | D-07 | Hash extracted text, not raw HTML | Raw HTML churns and breaks change detection |
 | D-08 | No SSPL/BSL dependencies ever | Long-term license safety |
+| D-09 | NuExtract3 via its native template protocol, not JSON Schema | It takes no system prompt; `verbatim-string` enforces the evidence rule at the model level |
+| D-10 | NuExtract templates derived from the same Pydantic models | One source of truth; the two wire formats cannot drift |
+| D-11 | `num_ctx` 8192, not the model default 131072 | KV cache at 131k would not fit in available RAM |
+| D-12 | Negative-evidence citation blocked deterministically, not just by prompt | Job-hunting drift is the spec's primary failure mode |

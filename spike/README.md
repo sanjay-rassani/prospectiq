@@ -11,7 +11,8 @@ operator-assisted.
 
 ```bash
 # 1. Ollama must be installed and serving on 127.0.0.1:11434
-ollama pull nuextract3:q4_k_m          # extraction (4B, Apache-2.0)
+ollama pull numind/nuextract3:q4_k_m   # extraction (4B, Apache-2.0). Note the namespace:
+                                       # bare `nuextract3:q4_k_m` does not resolve.
 ollama pull qwen3.5:4b                 # generation; try 9b only if 4b output is unusable
 
 # 2. List your sample pages
@@ -20,9 +21,30 @@ cp urls.example.txt urls.txt && $EDITOR urls.txt
 # 3. Fetch, run, score
 source ../.venv/bin/activate
 python fetch_pages.py
-python run_spike.py --extract-model nuextract3:q4_k_m --gen-model qwen3.5:4b
+python run_spike.py                    # defaults to the two models above
 python verify.py
 ```
+
+## Two models, two protocols
+
+Extraction and generation are different jobs, so they use different models and different
+wire formats.
+
+**NuExtract3** takes no system prompt. It expects an extraction *template* in its own
+vocabulary via a `template` message role, with `instructions` standing in for the system
+prompt. `schemas.nuextract_template()` derives that template from the same Pydantic models
+that validate the output, so the two representations cannot drift.
+
+Its native `verbatim-string` type is why it's here: it means "copy this exactly from the
+source", which is precisely the guarantee `evidence_excerpt` needs. That moves the evidence
+rule from something we request in a prompt to something the model was trained to do, and
+leaves `verify.py` as a check the model should pass by construction.
+
+**qwen3.5:4b** handles hypothesis generation through an ordinary system prompt plus
+grammar-constrained JSON via Ollama's `format` parameter.
+
+Passing `--extract-model qwen3.5:4b` switches extraction to the general model and the
+standard protocol, which is the comparison to run if the verdict comes out borderline.
 
 ## What to put in urls.txt
 
@@ -54,9 +76,9 @@ pass: build the pipeline, but treat generation as a draft the operator rewrites.
 
 | File | Role |
 | --- | --- |
-| `schemas.py` | Output schemas. **The durable artifact** — becomes `app/services/llm` in Phase 3. |
-| `prompts.py` | Prompts, including the first draft of untrusted-input framing (P3-4). |
-| `ollama_client.py` | Thin client: constrained JSON, validation, bounded retries. |
+| `schemas.py` | Output schemas + both renderers (JSON Schema, NuExtract template). **The durable artifact** — becomes `app/services/llm` in Phase 3. |
+| `prompts.py` | System prompts and NuExtract `instructions`, including the first draft of untrusted-input framing (P3-4). |
+| `ollama_client.py` | Thin client: both protocols, validation, bounded retries. |
 | `fetch_pages.py` | Rehearsal of the Phase 2 fetcher; hashes extracted text, not HTML. |
 | `run_spike.py` | Runs the three tasks over every page, records latency. |
 | `verify.py` | Automated rubric plus the manual-review dump. |

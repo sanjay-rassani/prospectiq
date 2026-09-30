@@ -69,7 +69,10 @@ class SolutionFamily(StrEnum):
 class CompanyFacts(BaseModel):
     """Observable facts only. Nothing here may be inferred from industry norms."""
 
-    name: str | None = Field(description="Company name as stated on the page, else null.")
+    name: str | None = Field(
+        description="Company name as stated on the page, else null.",
+        json_schema_extra={"nuextract_type": "verbatim-string"},
+    )
     one_line_description: str | None = Field(
         description="What the business does, in one sentence, using only the page's own claims."
     )
@@ -103,11 +106,16 @@ class Signal(BaseModel):
     summary: str = Field(description="One sentence describing what was observed.")
     evidence_excerpt: str = Field(
         description="A VERBATIM span copied character-for-character from the source text "
-        "that proves this signal. Never paraphrase. Never write text not in the source."
+        "that proves this signal. Never paraphrase. Never write text not in the source.",
+        # NuExtract's native `verbatim-string` type enforces at the model level what
+        # verify.py checks after the fact. This is the field the whole evidence
+        # guarantee (spec section 6.2) depends on.
+        json_schema_extra={"nuextract_type": "verbatim-string"},
     )
     strength: SignalStrength
     observed_at: str | None = Field(
-        description="ISO date if the source states when this happened, else null."
+        description="ISO date if the source states when this happened, else null.",
+        json_schema_extra={"nuextract_type": "date-time"},
     )
 
 
@@ -170,3 +178,62 @@ def strict_schema(model: type[BaseModel]) -> dict[str, Any]:
 
     tighten(schema)
     return schema
+
+
+def nuextract_template(model: type[BaseModel]) -> dict[str, Any]:
+    """Convert a Pydantic model to a NuExtract extraction template.
+
+    NuExtract3 does not take a system prompt or a JSON Schema. It takes a *template* in
+    its own vocabulary, passed in a `template` message role:
+
+        "verbatim-string"       copy exactly from the source
+        "string"                free text
+        "number" / "date-time"  typed scalars
+        ["a", "b", "c"]         enum, pick one
+        [ <single item> ]       array of that item
+
+    Deriving the template from the same Pydantic models that validate the output keeps one
+    source of truth, so the two representations cannot drift apart.
+    """
+    schema = model.model_json_schema()
+    defs = schema.get("$defs", {})
+
+    def resolve(node: dict[str, Any]) -> dict[str, Any]:
+        if "$ref" in node:
+            return defs[node["$ref"].rsplit("/", 1)[-1]]
+        return node
+
+    def render(node: dict[str, Any]) -> Any:
+        node = resolve(node)
+
+        # Checked before anything else: on an Optional field the marker sits on the outer
+        # node, so descending into anyOf first would silently discard it.
+        if "nuextract_type" in node:
+            return node["nuextract_type"]
+
+        # Optional[X] becomes anyOf[X, null]. NuExtract has no null type, so render the
+        # real branch; a missing value comes back as empty and Pydantic accepts the null.
+        if "anyOf" in node:
+            branches = [b for b in node["anyOf"] if resolve(b).get("type") != "null"]
+            return render(branches[0]) if branches else "string"
+
+        if "enum" in node:
+            return list(node["enum"])
+
+        node_type = node.get("type")
+
+        if node_type == "object":
+            return {name: render(sub) for name, sub in node.get("properties", {}).items()}
+        if node_type == "array":
+            return [render(node.get("items", {"type": "string"}))]
+        if node_type in ("integer", "number"):
+            return "number"
+        if node_type == "boolean":
+            # NuExtract documents no boolean type. An explicit two-value enum is the
+            # closest equivalent; Pydantic coerces the resulting "true"/"false" to bool.
+            return ["true", "false"]
+        if node.get("format") == "date-time":
+            return "date-time"
+        return "string"
+
+    return render(schema)
