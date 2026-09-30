@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     # RAM on this machine (decision D-11).
     llm_num_ctx: int = 8192
     llm_timeout_seconds: float = 600.0
+    # Initial attempt + up to 2 retries (spec section 15.2).
+    llm_max_attempts: int = 3
+    # Cap page text before it reaches the model (task P3-4).
+    llm_max_input_chars: int = 12000
+    # Disable for environments without Ollama; seed/refresh still store snapshots.
+    llm_enabled: bool = True
 
     # Politeness defaults for the fetcher (spec section 18).
     user_agent: str = "ProspectingEngine/0.1 (personal business research)"

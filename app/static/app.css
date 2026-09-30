@@ -46,3 +46,12 @@ mark {
   padding: 0.35rem 0.6rem;
   margin-bottom: 1rem;
 }
+
+dl {
+  display: grid;
+  grid-template-columns: 12rem 1fr;
+  gap: 0.35rem 1rem;
+}
+dt { font-weight: 600; margin: 0; }
+dd { margin: 0; }
+tr.facts-source td { background: color-mix(in srgb, #2d6a4f 12%, transparent); }

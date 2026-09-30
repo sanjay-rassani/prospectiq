@@ -149,21 +149,26 @@ seed of the same domain returned `unchanged; no new snapshot` with still one row
 
 Goal: one narrow, well-behaved seam between deterministic code and the model.
 
-- [ ] **P3-1** `app/services/llm/` gateway: single entry point, Ollama HTTP client, strict
+- [x] **P3-1** `app/services/llm/` gateway: single entry point, Ollama HTTP client, strict
       `json_schema` format, `temperature: 0`, `think: false`, explicit timeouts.
-- [ ] **P3-2** Pydantic output schemas per task; validate then bounded-retry (max 2) on failure.
-- [ ] **P3-3** Prompt files with version identifiers; persist model name + prompt version +
+- [x] **P3-2** Pydantic output schemas per task; validate then bounded-retry (max 2) on failure.
+- [x] **P3-3** Prompt files with version identifiers; persist model name + prompt version +
       raw output on every call for debugging (§15.2).
-- [ ] **P3-4** **Untrusted-input handling.** Fetched text is hostile by default: wrap it in
+- [x] **P3-4** **Untrusted-input handling.** Fetched text is hostile by default: wrap it in
       explicit delimiters, state in the system prompt that page content is data and never
       instruction, cap input length, and strip obvious injection patterns. The spec flags this
       (§18) without specifying a mitigation — this task is that mitigation.
-- [ ] **P3-5** `extract_company_facts` wired to new snapshots only.
-- [ ] **P3-6** Skip rule: unchanged hash never reaches the model (AC-3), enforced in code and
+- [x] **P3-5** `extract_company_facts` wired to new snapshots only.
+- [x] **P3-6** Skip rule: unchanged hash never reaches the model (AC-3), enforced in code and
       covered by a test that asserts zero model calls.
-- [ ] **P3-7** Company detail UI: facts with a link to the originating snapshot.
+- [x] **P3-7** Company detail UI: facts with a link to the originating snapshot.
 
-**Milestone:** seeded company gets machine-extracted facts, each traceable to a source.
+**Milestone reached.** New snapshots run `extract_company_facts` through the local gateway
+(NuExtract template protocol by default); results land on `companies.facts_json` with
+`facts_snapshot_id` linking back to the source. Unchanged re-fetches create no snapshot and
+make zero model calls (asserted in tests). Every call is persisted in `llm_calls` with
+model, prompt version, raw output, and errors. 39 tests passing.
+**Acceptance:** AC-3 (skip unchanged), AC-2 path extended with traceable facts.
 
 ---
 
@@ -344,3 +349,6 @@ Record as we go, with reasoning. Seeded with what's already settled:
 | D-17 | Hash extracted text; skip insert when hash matches latest | Raw HTML churn would defeat change detection; AC-3 requires no duplicate work |
 | D-18 | robots.txt fail-open on fetch errors | Broken robots endpoint must not permanently block an explicitly seeded public page |
 | D-19 | Keep meaningful subdomains (`blog.x.com` ≠ `x.com`) | Over-collapsing would merge distinct properties; only strip `www` |
+| D-20 | Persist every LLM call in `llm_calls` | Spec §15.2 auditability; failures are inspectable without re-running |
+| D-21 | `facts_snapshot_id` FK with `use_alter` | Avoid create-order deadlock between companies and source_snapshots |
+| D-22 | `LLM_ENABLED` gate; tests default off, inject FakeGateway | Seed works without Ollama; AC-3 tests count real gateway calls |

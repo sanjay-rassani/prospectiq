@@ -57,10 +57,29 @@ class Company(Base, TimestampMixin):
     seed_url: Mapped[str | None] = mapped_column(String(2048))
     last_error: Mapped[str | None] = mapped_column(Text)
 
+    # Phase 3: structured facts from extract_company_facts, always linked to a snapshot.
+    facts_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    facts_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "source_snapshots.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_companies_facts_snapshot_id",
+        ),
+        index=True,
+    )
+    facts_extracted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     snapshots: Mapped[list[SourceSnapshot]] = relationship(
         back_populates="company",
         cascade="all, delete-orphan",
         order_by="desc(SourceSnapshot.fetched_at)",
+        foreign_keys="[SourceSnapshot.company_id]",
+    )
+    facts_snapshot: Mapped[SourceSnapshot | None] = relationship(
+        foreign_keys=[facts_snapshot_id],
+        post_update=True,
     )
 
 
@@ -88,4 +107,7 @@ class SourceSnapshot(Base, TimestampMixin):
     # etag, last_modified, extractor notes, final_url after redirects, etc.
     metadata_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
 
-    company: Mapped[Company] = relationship(back_populates="snapshots")
+    company: Mapped[Company] = relationship(
+        back_populates="snapshots",
+        foreign_keys=[company_id],
+    )

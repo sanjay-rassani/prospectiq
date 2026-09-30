@@ -9,9 +9,12 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.config import get_settings
 from app.models import Company, CompanyStatus, SourceSnapshot, SourceType
 from app.services.discovery.normalize import NormalizedTarget, parse_seed_blob
 from app.services.fetcher import Fetcher, FetchResult
+from app.services.llm.facts import extract_company_facts
+from app.services.llm.gateway import LlmGateway
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +26,7 @@ class SeedOutcome:
     snapshot: SourceSnapshot | None
     fetch: FetchResult
     message: str
+    facts_extracted: bool = False
 
 
 @dataclass
@@ -31,6 +35,7 @@ class RefreshOutcome:
     snapshot: SourceSnapshot | None
     fetch: FetchResult
     message: str
+    facts_extracted: bool = False
 
 
 def _latest_snapshot(session: Session, company_id: object, url: str) -> SourceSnapshot | None:
@@ -73,12 +78,30 @@ def _persist_snapshot(
     session.add(snapshot)
     company.last_researched_at = snapshot.fetched_at
     company.last_error = None
-    # Prefer a page title over the placeholder name derived from the domain slug.
     placeholder = company.domain.split(".")[0]
     if fetch.extracted.title and company.name.lower() in {company.domain, placeholder}:
         company.name = fetch.extracted.title[:255]
     session.flush()
     return snapshot
+
+
+def _maybe_extract_facts(
+    session: Session,
+    company: Company,
+    snapshot: SourceSnapshot | None,
+    gateway: LlmGateway | None,
+) -> bool:
+    """Run fact extraction only when a new snapshot was stored (P3-5, P3-6 / AC-3).
+
+    An explicit gateway always runs (tests inject fakes). Otherwise respect llm_enabled
+    so environments without Ollama can still seed snapshots.
+    """
+    if snapshot is None:
+        return False
+    if gateway is None and not get_settings().llm_enabled:
+        return False
+    result = extract_company_facts(session, company, snapshot, gateway=gateway)
+    return bool(result and result.ok)
 
 
 def get_or_create_company(
@@ -105,8 +128,9 @@ def seed_targets(
     session: Session,
     blob: str,
     fetcher: Fetcher | None = None,
+    gateway: LlmGateway | None = None,
 ) -> list[SeedOutcome]:
-    """Seed one or more companies from a textarea blob and fetch each seed URL once."""
+    """Seed companies, fetch each seed URL once, extract facts only for new snapshots."""
     targets = parse_seed_blob(blob)
     if not targets:
         return []
@@ -128,6 +152,7 @@ def seed_targets(
             )
 
             snapshot: SourceSnapshot | None = None
+            facts_extracted = False
             if fetch.ok and fetch.changed and fetch.extracted:
                 snapshot = _persist_snapshot(
                     session,
@@ -136,8 +161,12 @@ def seed_targets(
                     source_type=SourceType.MANUAL_SEED if created else SourceType.COMPANY_PAGE,
                     previous_hash=latest.content_hash if latest else None,
                 )
+                facts_extracted = _maybe_extract_facts(session, company, snapshot, gateway)
                 message = "snapshot stored" if created else "content changed; snapshot stored"
+                if facts_extracted:
+                    message += "; facts extracted"
             elif fetch.ok and not fetch.changed:
+                # AC-3: unchanged content must not reach the LLM. Do not call extract here.
                 company.last_researched_at = datetime.now(UTC)
                 company.last_error = None
                 message = "unchanged; no new snapshot"
@@ -152,6 +181,7 @@ def seed_targets(
                     snapshot=snapshot,
                     fetch=fetch,
                     message=message,
+                    facts_extracted=facts_extracted,
                 )
             )
         session.flush()
@@ -165,8 +195,9 @@ def refresh_company(
     session: Session,
     company_id: object,
     fetcher: Fetcher | None = None,
+    gateway: LlmGateway | None = None,
 ) -> RefreshOutcome:
-    """Re-fetch the company's seed URL (or latest snapshot URL) and store only if changed."""
+    """Re-fetch and extract facts only when content changed."""
     company = session.scalar(
         select(Company)
         .where(Company.id == company_id)
@@ -195,6 +226,7 @@ def refresh_company(
             previous_hash=latest.content_hash if latest else None,
         )
         snapshot: SourceSnapshot | None = None
+        facts_extracted = False
         if fetch.ok and fetch.changed and fetch.extracted:
             snapshot = _persist_snapshot(
                 session,
@@ -203,7 +235,10 @@ def refresh_company(
                 source_type=SourceType.COMPANY_PAGE,
                 previous_hash=latest.content_hash if latest else None,
             )
+            facts_extracted = _maybe_extract_facts(session, company, snapshot, gateway)
             message = "content changed; snapshot stored"
+            if facts_extracted:
+                message += "; facts extracted"
         elif fetch.ok and not fetch.changed:
             company.last_researched_at = datetime.now(UTC)
             company.last_error = None
@@ -214,7 +249,11 @@ def refresh_company(
 
         session.flush()
         return RefreshOutcome(
-            company=company, snapshot=snapshot, fetch=fetch, message=message
+            company=company,
+            snapshot=snapshot,
+            fetch=fetch,
+            message=message,
+            facts_extracted=facts_extracted,
         )
     finally:
         if owns:

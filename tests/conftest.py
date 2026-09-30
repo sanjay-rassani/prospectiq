@@ -22,6 +22,19 @@ from app.main import app
 settings = get_settings()
 
 
+@pytest.fixture(autouse=True)
+def _disable_llm_unless_injected(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    """Phase 2 tests create snapshots without a gateway; keep them offline by default.
+
+    Phase 3 tests that need extraction pass an explicit FakeGateway, which bypasses the
+    llm_enabled gate when provided.
+    """
+    monkeypatch.setenv("LLM_ENABLED", "false")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
 @pytest.fixture(scope="session")
 def test_engine() -> Generator[Engine, None, None]:
     # CREATE DATABASE cannot run inside a transaction, hence the autocommit connection.

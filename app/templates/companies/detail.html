@@ -37,6 +37,72 @@
 {% endif %}
 
 <article>
+  <header><strong>Extracted facts</strong> <span class="label label-fact">observed</span></header>
+  {% if company.facts_json %}
+  <p>
+    <small>
+      Extracted {{ company.facts_extracted_at or "—" }}
+      {% if company.facts_snapshot_id %}
+      · from <a href="#snap-{{ company.facts_snapshot_id }}">source snapshot</a>
+      {% endif %}
+      {% if company.facts_json.confidence %}
+      · confidence {{ company.facts_json.confidence }}
+      {% endif %}
+    </small>
+  </p>
+  <dl>
+    {% if company.facts_json.one_line_description %}
+    <dt>Description</dt>
+    <dd>{{ company.facts_json.one_line_description }}</dd>
+    {% endif %}
+    {% if company.facts_json.industry or company.industry %}
+    <dt>Industry</dt>
+    <dd>{{ company.facts_json.industry or company.industry }}</dd>
+    {% endif %}
+    {% if company.facts_json.customer_type %}
+    <dt>Customer type</dt>
+    <dd>{{ company.facts_json.customer_type }}</dd>
+    {% endif %}
+    {% if company.facts_json.size_hint or company.size_hint %}
+    <dt>Size</dt>
+    <dd>{{ company.facts_json.size_hint or company.size_hint }}</dd>
+    {% endif %}
+    {% if company.facts_json.geography %}
+    <dt>Geography</dt>
+    <dd>{{ company.facts_json.geography | join(", ") }}</dd>
+    {% elif company.geography %}
+    <dt>Geography</dt>
+    <dd>{{ company.geography }}</dd>
+    {% endif %}
+    {% if company.facts_json.products_or_services %}
+    <dt>Products / services</dt>
+    <dd>{{ company.facts_json.products_or_services | join(", ") }}</dd>
+    {% endif %}
+    {% if company.facts_json.technologies_mentioned %}
+    <dt>Technologies mentioned</dt>
+    <dd>{{ company.facts_json.technologies_mentioned | join(", ") }}</dd>
+    {% endif %}
+    {% if company.facts_json.notable_claims %}
+    <dt>Notable claims</dt>
+    <dd>
+      <ul>
+        {% for claim in company.facts_json.notable_claims %}
+        <li>{{ claim }}</li>
+        {% endfor %}
+      </ul>
+    </dd>
+    {% endif %}
+    <dt>Recruiter / staffing</dt>
+    <dd>{{ "yes — disqualified" if company.facts_json.is_recruiter_or_staffing else "no" }}</dd>
+    <dt>Job / careers page</dt>
+    <dd>{{ "yes" if company.facts_json.is_job_or_careers_page else "no" }}</dd>
+  </dl>
+  {% else %}
+  <p>No facts extracted yet. Seed or refresh a page with new content (unchanged pages are never sent to the model).</p>
+  {% endif %}
+</article>
+
+<article>
   <header><strong>Source snapshots</strong></header>
   {% if company.snapshots %}
   <table>
@@ -52,11 +118,14 @@
     </thead>
     <tbody>
       {% for snap in company.snapshots %}
-      <tr>
+      <tr{% if company.facts_snapshot_id == snap.id %} class="facts-source"{% endif %}>
         <td>{{ snap.fetched_at }}</td>
         <td>{{ snap.source_type }}</td>
         <td>
           <a href="#snap-{{ snap.id }}">{{ snap.title or snap.url }}</a>
+          {% if company.facts_snapshot_id == snap.id %}
+          <span class="label label-fact">facts source</span>
+          {% endif %}
         </td>
         <td>{{ snap.http_status or "—" }}</td>
         <td><code title="{{ snap.content_hash }}">{{ snap.content_hash[:10] }}…</code></td>
