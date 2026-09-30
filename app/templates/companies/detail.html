@@ -103,6 +103,74 @@
 </article>
 
 <article>
+  <header><strong>Signals</strong> <span class="label label-fact">observed</span></header>
+  {% if company.signals %}
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Strength</th>
+        <th>Summary</th>
+        <th>Evidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for signal in company.signals %}
+      <tr>
+        <td>{{ signal.type }}</td>
+        <td>{{ signal.strength }}</td>
+        <td>{{ signal.summary }}</td>
+        <td><blockquote class="evidence">{{ signal.evidence_excerpt[:240] }}{% if signal.evidence_excerpt|length > 240 %}…{% endif %}</blockquote></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No signals yet.</p>
+  {% endif %}
+</article>
+
+<article>
+  <header><strong>Opportunities</strong> <span class="label label-hypothesis">hypothesis</span></header>
+  {% set active_opps = company.opportunities | selectattr('status', 'equalto', 'active') | list %}
+  {% if active_opps %}
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Family</th>
+        <th>Confidence</th>
+        <th>Buyer</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for opp in active_opps %}
+      <tr>
+        <td><a href="/opportunities/{{ opp.id }}">{{ opp.title }}</a></td>
+        <td>{{ opp.solution_family }}</td>
+        <td>{{ opp.confidence }}</td>
+        <td>{{ opp.buyer_role }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No active opportunities. Hypotheses appear after evidence-backed signals are extracted.</p>
+  {% endif %}
+  {% set superseded = company.opportunities | selectattr('status', 'equalto', 'superseded') | list %}
+  {% if superseded %}
+  <details>
+    <summary>{{ superseded|length }} superseded</summary>
+    <ul>
+      {% for opp in superseded %}
+      <li><a href="/opportunities/{{ opp.id }}">{{ opp.title }}</a> ({{ opp.confidence }})</li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+</article>
+
+<article>
   <header><strong>Source snapshots</strong></header>
   {% if company.snapshots %}
   <table>

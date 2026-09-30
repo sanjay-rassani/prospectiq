@@ -1,0 +1,77 @@
+"""Post-snapshot research pipeline: facts → signals → opportunities."""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+
+from sqlalchemy.orm import Session
+
+from app.config import get_settings
+from app.models import Company, Opportunity, Signal, SourceSnapshot
+from app.services.llm.facts import extract_company_facts
+from app.services.llm.gateway import LlmGateway
+from app.services.llm.opportunities import (
+    generate_and_persist_opportunities,
+    load_company_signals_for_generation,
+)
+from app.services.llm.signals import extract_and_persist_signals
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PipelineResult:
+    facts_ok: bool = False
+    signals: list[Signal] = field(default_factory=list)
+    signals_dropped: int = 0
+    opportunities: list[Opportunity] = field(default_factory=list)
+
+    @property
+    def summary(self) -> str:
+        parts: list[str] = []
+        if self.facts_ok:
+            parts.append("facts")
+        if self.signals:
+            parts.append(f"{len(self.signals)} signals")
+        if self.signals_dropped:
+            parts.append(f"{self.signals_dropped} fabricated dropped")
+        if self.opportunities:
+            parts.append(f"{len(self.opportunities)} opportunities")
+        return "; ".join(parts) if parts else "no LLM output"
+
+
+def process_new_snapshot(
+    session: Session,
+    company: Company,
+    snapshot: SourceSnapshot,
+    gateway: LlmGateway | None = None,
+) -> PipelineResult | None:
+    """Run the Phase 3-4 research chain for a newly stored snapshot only.
+
+    Unchanged re-fetches must never call this (AC-3 / P3-6).
+    """
+    if gateway is None and not get_settings().llm_enabled:
+        return None
+
+    result = PipelineResult()
+
+    facts = extract_company_facts(session, company, snapshot, gateway=gateway)
+    result.facts_ok = bool(facts and facts.ok)
+
+    signals, _sig_call, dropped = extract_and_persist_signals(
+        session, company, snapshot, gateway=gateway
+    )
+    result.signals = signals
+    result.signals_dropped = dropped
+
+    # P4-9: any newly persisted signal (including negative_weak) triggers re-evaluation
+    # using the company's full signal set. Generation itself filters negative-only hyps.
+    if signals:
+        all_signals = load_company_signals_for_generation(session, company.id)
+        opps, _opp_call = generate_and_persist_opportunities(
+            session, company, snapshot, all_signals, gateway=gateway
+        )
+        result.opportunities = opps
+
+    return result

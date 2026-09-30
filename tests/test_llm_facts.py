@@ -12,7 +12,14 @@ from app.models import LlmCall, SourceSnapshot
 from app.services.discovery.seed import refresh_company, seed_targets
 from app.services.fetcher import Fetcher
 from app.services.llm.gateway import CallResult
-from app.services.llm.schemas import CompanyFacts, Confidence, CustomerType, SizeHint
+from app.services.llm.schemas import (
+    CompanyFacts,
+    Confidence,
+    CustomerType,
+    OpportunityList,
+    SignalList,
+    SizeHint,
+)
 from app.services.llm.untrusted import sanitize_fetched_text
 
 HTML = """<!DOCTYPE html><html><head><title>Acme</title></head>
@@ -28,12 +35,18 @@ class FakeGateway:
     """Counts calls so AC-3 can assert the model was never invoked."""
 
     calls: int = 0
+    fact_calls: int = 0
+    signal_calls: int = 0
+    opportunity_calls: int = 0
     facts: CompanyFacts | None = None
+    signal_list: SignalList | None = None
+    opportunity_list: OpportunityList | None = None
     fail: bool = False
     seen_texts: list[str] = field(default_factory=list)
 
     def extract_facts(self, *, url: str, text: str) -> CallResult:
         self.calls += 1
+        self.fact_calls += 1
         self.seen_texts.append(text)
         if self.fail:
             return CallResult(
@@ -72,6 +85,40 @@ class FakeGateway:
             attempts=1,
         )
 
+    def extract_signals(self, *, url: str, text: str) -> CallResult:
+        self.calls += 1
+        self.signal_calls += 1
+        parsed = self.signal_list or SignalList(signals=[], no_signal_reason="none in fixture")
+        return CallResult(
+            ok=True,
+            parsed=parsed,
+            raw_output=parsed.model_dump_json(),
+            model="fake",
+            prompt_version="v1",
+            task="extract_signals",
+            seconds=0.01,
+            attempts=1,
+        )
+
+    def generate_opportunities(
+        self, *, facts_json: str, signals_json: str
+    ) -> CallResult:
+        self.calls += 1
+        self.opportunity_calls += 1
+        parsed = self.opportunity_list or OpportunityList(
+            opportunities=[], no_opportunity_reason="none in fixture"
+        )
+        return CallResult(
+            ok=True,
+            parsed=parsed,
+            raw_output=parsed.model_dump_json(),
+            model="fake",
+            prompt_version="v1",
+            task="generate_opportunities",
+            seconds=0.01,
+            attempts=1,
+        )
+
 
 def _fetcher(html: str = HTML) -> Fetcher:
     def handler(request: httpx.Request) -> httpx.Response:
@@ -105,7 +152,9 @@ def test_new_snapshot_extracts_facts_and_persists_llm_call(session: Session) -> 
     )
     assert len(outcomes) == 1
     assert outcomes[0].facts_extracted
-    assert gateway.calls == 1
+    assert gateway.fact_calls == 1
+    assert gateway.signal_calls == 1
+    assert gateway.opportunity_calls == 0  # no signals → no generation
 
     company = outcomes[0].company
     assert company.facts_json is not None
@@ -115,11 +164,9 @@ def test_new_snapshot_extracts_facts_and_persists_llm_call(session: Session) -> 
     assert company.description == "B2B freight company."
 
     calls = session.scalars(select(LlmCall)).all()
-    assert len(calls) == 1
-    assert calls[0].ok is True
-    assert calls[0].prompt_version == "v1"
-    assert calls[0].task == "extract_company_facts"
-    assert calls[0].parsed_json is not None
+    assert len(calls) == 2
+    tasks = {c.task for c in calls}
+    assert tasks == {"extract_company_facts", "extract_signals"}
 
 
 def test_unchanged_refresh_does_not_call_llm(session: Session) -> None:
@@ -130,20 +177,20 @@ def test_unchanged_refresh_does_not_call_llm(session: Session) -> None:
         fetcher=_fetcher(),
         gateway=gateway,
     )
-    assert gateway.calls == 1
+    assert gateway.calls == 2
     company_id = seeded[0].company.id
 
     refreshed = refresh_company(
         session,
         company_id,
-        fetcher=_fetcher(),  # same HTML → unchanged hash
+        fetcher=_fetcher(),
         gateway=gateway,
     )
     assert refreshed.snapshot is None
     assert "unchanged" in refreshed.message
-    assert gateway.calls == 1  # AC-3: no additional model call
+    assert gateway.calls == 2  # AC-3: no additional model call
     assert session.scalar(select(func.count()).select_from(SourceSnapshot)) == 1
-    assert session.scalar(select(func.count()).select_from(LlmCall)) == 1
+    assert session.scalar(select(func.count()).select_from(LlmCall)) == 2
 
 
 def test_changed_refresh_calls_llm_again(session: Session) -> None:
@@ -164,8 +211,8 @@ def test_changed_refresh_calls_llm_again(session: Session) -> None:
     )
     assert refreshed.snapshot is not None
     assert refreshed.facts_extracted
-    assert gateway.calls == 2
-    assert session.scalar(select(func.count()).select_from(LlmCall)) == 2
+    assert gateway.calls == 4  # facts+signals twice
+    assert session.scalar(select(func.count()).select_from(LlmCall)) == 4
 
 
 def test_recruiter_facts_disqualify_company(session: Session) -> None:

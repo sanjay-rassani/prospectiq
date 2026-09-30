@@ -112,7 +112,11 @@ def company_detail(
     company = session.scalar(
         select(Company)
         .where(Company.id == company_id)
-        .options(selectinload(Company.snapshots))
+        .options(
+            selectinload(Company.snapshots),
+            selectinload(Company.signals),
+            selectinload(Company.opportunities),
+        )
     )
     if company is None:
         return templates.TemplateResponse(

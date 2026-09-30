@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% set active = 'companies' %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ul>
+    <li><a href="/companies">Companies</a></li>
+    <li><a href="/companies/{{ opportunity.company_id }}">{{ opportunity.company.name }}</a></li>
+    <li>{{ opportunity.title }}</li>
+  </ul>
+</nav>
+
+<header>
+  <h1>{{ opportunity.title }}</h1>
+  <p>
+    <span class="label label-hypothesis">hypothesis</span>
+    · {{ opportunity.solution_family }}
+    · confidence {{ opportunity.confidence }}
+    · {{ opportunity.status }}
+  </p>
+</header>
+
+<article>
+  <header><strong>Problem or change</strong> <span class="label label-inference">inference</span></header>
+  <p>{{ opportunity.problem_or_change }}</p>
+</article>
+
+<article>
+  <header><strong>Project hypothesis</strong> <span class="label label-hypothesis">hypothesis</span></header>
+  <p>{{ opportunity.hypothesis }}</p>
+</article>
+
+<article>
+  <header><strong>Why now</strong></header>
+  <p>{{ opportunity.why_now }}</p>
+</article>
+
+<article>
+  <header><strong>Business outcome</strong></header>
+  <p>{{ opportunity.business_outcome }}</p>
+</article>
+
+<article>
+  <header><strong>Buyer role</strong></header>
+  <p>{{ opportunity.buyer_role }}</p>
+</article>
+
+<article>
+  <header><strong>Unknowns / risks</strong></header>
+  {% if opportunity.unknowns %}
+  <ul>
+    {% for item in opportunity.unknowns %}
+    <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>None stated.</p>
+  {% endif %}
+</article>
+
+<article>
+  <header><strong>Evidence</strong> <span class="label label-fact">observed</span></header>
+  {% if opportunity.evidence_links %}
+  {% for link in opportunity.evidence_links %}
+  {% if link.signal %}
+  <section>
+    <p>
+      <strong>{{ link.signal.type }}</strong>
+      · {{ link.signal.strength }}
+    </p>
+    <p>{{ link.signal.summary }}</p>
+    <blockquote class="evidence">{{ link.signal.evidence_excerpt }}</blockquote>
+    {% if link.signal.source_snapshot_id %}
+    <p><small>From <a href="/companies/{{ opportunity.company_id }}#snap-{{ link.signal.source_snapshot_id }}">source snapshot</a></small></p>
+    {% endif %}
+  </section>
+  {% endif %}
+  {% endfor %}
+  {% else %}
+  <p>No evidence linked.</p>
+  {% endif %}
+</article>
+{% endblock %}

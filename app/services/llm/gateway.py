@@ -46,6 +46,12 @@ class CallResult:
 class LlmGateway(Protocol):
     def extract_facts(self, *, url: str, text: str) -> CallResult: ...
 
+    def extract_signals(self, *, url: str, text: str) -> CallResult: ...
+
+    def generate_opportunities(
+        self, *, facts_json: str, signals_json: str
+    ) -> CallResult: ...
+
 
 class OllamaGateway:
     """Production gateway talking to a local Ollama instance."""
@@ -93,6 +99,46 @@ class OllamaGateway:
             output_model=CompanyFacts,
             prompt_version=prompts.PROMPT_VERSION,
             task="extract_company_facts",
+        )
+
+    def extract_signals(self, *, url: str, text: str) -> CallResult:
+        from app.services.llm import prompts
+        from app.services.llm.schemas import SignalList
+        from app.services.llm.untrusted import sanitize_fetched_text
+
+        cleaned = sanitize_fetched_text(text, max_chars=self.settings.llm_max_input_chars)
+        model = self.settings.extraction_model
+        if "nuextract" in model.lower():
+            return self.call_nuextract(
+                model=model,
+                document=prompts.signals_document(url, cleaned),
+                output_model=SignalList,
+                prompt_version=prompts.PROMPT_VERSION,
+                task="extract_signals",
+                instructions=prompts.EXTRACT_SIGNALS_INSTRUCTIONS,
+            )
+        return self.call_schema(
+            model=model,
+            system=prompts.EXTRACT_SIGNALS_SYSTEM,
+            user=prompts.signals_user_prompt(url, cleaned),
+            output_model=SignalList,
+            prompt_version=prompts.PROMPT_VERSION,
+            task="extract_signals",
+        )
+
+    def generate_opportunities(
+        self, *, facts_json: str, signals_json: str
+    ) -> CallResult:
+        from app.services.llm import prompts
+        from app.services.llm.schemas import OpportunityList
+
+        return self.call_schema(
+            model=self.settings.generation_model,
+            system=prompts.GENERATE_OPPORTUNITIES_SYSTEM,
+            user=prompts.opportunities_user_prompt(facts_json, signals_json),
+            output_model=OpportunityList,
+            prompt_version=prompts.PROMPT_VERSION,
+            task="generate_opportunities",
         )
 
     def call_schema(

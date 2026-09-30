@@ -17,6 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.companies import router as companies_router
+from app.api.opportunities import router as opportunities_router
 from app.config import get_settings
 from app.db.session import get_session
 
@@ -43,6 +44,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.state.templates = templates
 
 app.include_router(companies_router)
+app.include_router(opportunities_router)
 
 
 @app.get("/health")

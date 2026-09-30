@@ -176,19 +176,23 @@ model, prompt version, raw output, and errors. 39 tests passing.
 
 Goal: the actual product value — evidence becomes a testable project idea.
 
-- [ ] **P4-1** `Signal` model with type enum from §6.3, incl. negative/weak evidence.
-- [ ] **P4-2** `extract_signals` task; reject any signal whose `evidence_excerpt` is not
+- [x] **P4-1** `Signal` model with type enum from §6.3, incl. negative/weak evidence.
+- [x] **P4-2** `extract_signals` task; reject any signal whose `evidence_excerpt` is not
       literally present in the snapshot text. Silent drop + log, never persist.
-- [ ] **P4-3** `Opportunity` model with the full §7.1 field set.
-- [ ] **P4-4** `OpportunityEvidence` join table.
-- [ ] **P4-5** `generate_opportunities`: company + signals → hypotheses, each linked to evidence.
-- [ ] **P4-6** Solution-family enum from §3.2; reject outputs that invent a family.
-- [ ] **P4-7** Fact / inference / hypothesis labelling surfaced in the UI (§6.2).
-- [ ] **P4-8** Opportunity detail page: problem, hypothesis, why-now, evidence, confidence,
+- [x] **P4-3** `Opportunity` model with the full §7.1 field set.
+- [x] **P4-4** `OpportunityEvidence` join table.
+- [x] **P4-5** `generate_opportunities`: company + signals → hypotheses, each linked to evidence.
+- [x] **P4-6** Solution-family enum from §3.2; reject outputs that invent a family.
+- [x] **P4-7** Fact / inference / hypothesis labelling surfaced in the UI (§6.2).
+- [x] **P4-8** Opportunity detail page: problem, hypothesis, why-now, evidence, confidence,
       unknowns.
-- [ ] **P4-9** Change-triggered re-evaluation: a new signal re-runs hypothesis generation.
+- [x] **P4-9** Change-triggered re-evaluation: a new signal re-runs hypothesis generation.
 
-**Milestone:** changed page → new signal → new-or-updated opportunity with visible evidence.
+**Milestone reached.** New snapshots run facts → signals → opportunities. Fabricated
+`evidence_excerpt` values are dropped before persist. Hypotheses that cite only
+`negative_weak` signals are discarded. A content change with new signals supersedes prior
+active opportunities and writes a fresh set with evidence links. Company detail and
+opportunity detail pages label observed / inference / hypothesis. 43 tests passing.
 **Acceptance:** FR-04, FR-06, AC-4, AC-5.
 
 ---
@@ -352,3 +356,6 @@ Record as we go, with reasoning. Seeded with what's already settled:
 | D-20 | Persist every LLM call in `llm_calls` | Spec §15.2 auditability; failures are inspectable without re-running |
 | D-21 | `facts_snapshot_id` FK with `use_alter` | Avoid create-order deadlock between companies and source_snapshots |
 | D-22 | `LLM_ENABLED` gate; tests default off, inject FakeGateway | Seed works without Ollama; AC-3 tests count real gateway calls |
+| D-23 | Drop signals whose excerpt is not in source text | Spec §6.2: fabricated evidence must never persist |
+| D-24 | Discard opportunities that cite only `negative_weak` | Deterministic block on job-hunting drift (extends D-12) |
+| D-25 | Supersede active opportunities on signal-triggered re-eval | Change-triggered refresh (P4-9) without mutating history |

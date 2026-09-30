@@ -33,6 +33,35 @@ class Confidence(StrEnum):
     HIGH = "high"
 
 
+class SignalType(StrEnum):
+    """Spec section 6.3. NEGATIVE_WEAK counts against a prospect, not for it."""
+
+    GROWTH_EXPANSION = "growth_expansion"
+    PRODUCT = "product"
+    OPERATIONS = "operations"
+    TECHNOLOGY = "technology"
+    AI = "ai"
+    LEADERSHIP_STRATEGY = "leadership_strategy"
+    NEGATIVE_WEAK = "negative_weak"
+
+
+class SignalStrength(StrEnum):
+    WEAK = "weak"
+    MODERATE = "moderate"
+    STRONG = "strong"
+
+
+class SolutionFamily(StrEnum):
+    """Spec section 3.2. A hypothesis outside these families is out of scope."""
+
+    AGENTIC_AI_AUTOMATION = "agentic_ai_automation"
+    CUSTOM_SOFTWARE_SAAS = "custom_software_saas"
+    INTEGRATIONS_APIS = "integrations_apis"
+    BACKEND_DATA_SEARCH = "backend_data_search"
+    MODERNIZATION_SCALE = "modernization_scale"
+    FULL_STACK_PRODUCT = "full_stack_product"
+
+
 class CompanyFacts(BaseModel):
     """Observable facts only. Nothing here may be inferred from industry norms."""
 
@@ -77,6 +106,55 @@ class CompanyFacts(BaseModel):
             if lowered in {"false", "no", "0", ""}:
                 return False
         return value
+
+
+class ExtractedSignal(BaseModel):
+    type: SignalType
+    summary: str = Field(description="One sentence describing what was observed.")
+    evidence_excerpt: str = Field(
+        description="A VERBATIM span copied character-for-character from the source text.",
+        json_schema_extra={"nuextract_type": "verbatim-string"},
+    )
+    strength: SignalStrength
+    observed_at: str | None = Field(
+        description="ISO date if the source states when this happened, else null.",
+        json_schema_extra={"nuextract_type": "date-time"},
+    )
+
+
+class SignalList(BaseModel):
+    signals: list[ExtractedSignal] = Field(
+        description="Evidence-backed observations. Empty list is often correct."
+    )
+    no_signal_reason: str | None = Field(
+        description="If signals is empty, why. Else null."
+    )
+
+
+class OpportunityHypothesis(BaseModel):
+    """Spec section 7.1. A testable hypothesis, not a service pitch."""
+
+    title: str
+    problem_or_change: str = Field(description="The observed change or pain point.")
+    project_hypothesis: str = Field(description="What could realistically be built.")
+    solution_family: SolutionFamily
+    business_outcome: str = Field(
+        description="Expected value in qualitative terms. Never invent numbers."
+    )
+    why_now: str = Field(description="The current trigger that makes this timely.")
+    buyer_role: str = Field(description="Role likely to own this problem and its budget.")
+    confidence: Confidence
+    risks_or_unknowns: list[str] = Field(description="What is still assumed or missing.")
+    supporting_signal_indexes: list[int] = Field(
+        description="Zero-based indexes of input signals that support this hypothesis."
+    )
+
+
+class OpportunityList(BaseModel):
+    opportunities: list[OpportunityHypothesis] = Field(
+        description="Empty list if the evidence supports no credible project."
+    )
+    no_opportunity_reason: str | None
 
 
 def strict_schema(model: type[BaseModel]) -> dict[str, Any]:

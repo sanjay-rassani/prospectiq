@@ -5,13 +5,16 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.signal import Opportunity, Signal
 
 
 class CompanyStatus(enum.StrEnum):
@@ -80,6 +83,16 @@ class Company(Base, TimestampMixin):
     facts_snapshot: Mapped[SourceSnapshot | None] = relationship(
         foreign_keys=[facts_snapshot_id],
         post_update=True,
+    )
+    signals: Mapped[list[Signal]] = relationship(
+        back_populates="company",
+        cascade="all, delete-orphan",
+        order_by="desc(Signal.created_at)",
+    )
+    opportunities: Mapped[list[Opportunity]] = relationship(
+        back_populates="company",
+        cascade="all, delete-orphan",
+        order_by="desc(Opportunity.created_at)",
     )
 
 
