@@ -1,0 +1,59 @@
+# Operator profile — edit this file to tune targeting and ranking.
+# Loaded at process start. Settings UI comes in Phase 9.
+
+positioning: "Full-stack AI and software solutions provider"
+capabilities:
+  - agentic AI
+  - AI automation
+  - full-stack products
+  - SaaS
+  - APIs
+  - integrations
+  - backend
+  - data
+  - search
+  - RAG
+  - modernization
+preferred_solution_families:
+  - agentic_ai_automation
+  - custom_software_saas
+  - integrations_apis
+  - backend_data_search
+  - modernization_scale
+  - full_stack_product
+target_industries:
+  - logistics
+  - manufacturing
+  - healthcare
+  - fintech
+  - saas
+  - software
+  - professional services
+  - retail
+  - ecommerce
+target_regions:
+  - uk
+  - united kingdom
+  - europe
+  - eu
+  - us
+  - united states
+  - north america
+  - pakistan
+  - uae
+  - middle east
+excluded_industries:
+  - recruiting
+  - recruitment
+  - staffing
+  - gambling
+  - adult
+excluded_geographies: []
+do_not_contact_domains: []
+allow_agency_white_label: true
+# Opportunity Score thresholds (0-100).
+thresholds:
+  band_high: 75
+  band_medium: 55
+  band_watch: 35
+  outreach_ready_min: 65

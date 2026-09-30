@@ -18,6 +18,7 @@ dependencies = [
     "feedparser>=6.0",
     "apscheduler>=3.10,<4.0",
     "python-multipart>=0.0.12",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -59,7 +60,7 @@ disallow_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["trafilatura.*", "feedparser.*", "apscheduler.*"]
+module = ["trafilatura.*", "feedparser.*", "apscheduler.*", "yaml.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

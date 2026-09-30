@@ -16,6 +16,7 @@ from app.services.llm.opportunities import (
     load_company_signals_for_generation,
 )
 from app.services.llm.signals import extract_and_persist_signals
+from app.services.scoring import score_company_and_opportunities
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ class PipelineResult:
     signals: list[Signal] = field(default_factory=list)
     signals_dropped: int = 0
     opportunities: list[Opportunity] = field(default_factory=list)
+    scored: bool = False
 
     @property
     def summary(self) -> str:
@@ -38,6 +40,8 @@ class PipelineResult:
             parts.append(f"{self.signals_dropped} fabricated dropped")
         if self.opportunities:
             parts.append(f"{len(self.opportunities)} opportunities")
+        if self.scored:
+            parts.append("scored")
         return "; ".join(parts) if parts else "no LLM output"
 
 
@@ -47,7 +51,7 @@ def process_new_snapshot(
     snapshot: SourceSnapshot,
     gateway: LlmGateway | None = None,
 ) -> PipelineResult | None:
-    """Run the Phase 3-4 research chain for a newly stored snapshot only.
+    """Run the Phase 3-5 research chain for a newly stored snapshot only.
 
     Unchanged re-fetches must never call this (AC-3 / P3-6).
     """
@@ -65,13 +69,16 @@ def process_new_snapshot(
     result.signals = signals
     result.signals_dropped = dropped
 
-    # P4-9: any newly persisted signal (including negative_weak) triggers re-evaluation
-    # using the company's full signal set. Generation itself filters negative-only hyps.
+    # P4-9: any newly persisted signal triggers opportunity re-evaluation.
     if signals:
         all_signals = load_company_signals_for_generation(session, company.id)
         opps, _opp_call = generate_and_persist_opportunities(
             session, company, snapshot, all_signals, gateway=gateway
         )
         result.opportunities = opps
+
+    # Phase 5: always recompute ICP after facts; score opportunities when present.
+    score_company_and_opportunities(session, company)
+    result.scored = True
 
     return result

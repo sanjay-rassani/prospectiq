@@ -20,6 +20,71 @@
   </p>
 </header>
 
+{# ICP Fit and Opportunity Score are shown separately and never blended (AC-6). #}
+<article>
+  <header><strong>Company ICP Fit</strong> <small>(who they are — timing-blind)</small></header>
+  <p>
+    {% if opportunity.company.icp_score is not none %}
+    <strong>{{ '%.1f'|format(opportunity.company.icp_score) }}</strong>
+    {% if opportunity.company.priority %}
+    · band <span class="band band-{{ opportunity.company.priority }}">{{ opportunity.company.priority }}</span>
+    {% endif %}
+    {% else %}
+    Not scored
+    {% endif %}
+  </p>
+</article>
+
+<article>
+  <header><strong>Opportunity Score</strong> <small>(is this worth approaching now)</small></header>
+  {% if opportunity.opportunity_score is not none %}
+  <p>
+    Score <strong>{{ '%.1f'|format(opportunity.opportunity_score) }}</strong>
+    {% if opportunity.priority %}
+    · band <span class="band band-{{ opportunity.priority }}">{{ opportunity.priority }}</span>
+    {% endif %}
+  </p>
+  {% if opportunity.score_reasons_json and opportunity.score_reasons_json.dimensions %}
+  <table>
+    <thead><tr><th>Dimension</th><th>Weight</th><th>Score</th><th>Reason</th></tr></thead>
+    <tbody>
+      {% for dim in opportunity.score_reasons_json.dimensions %}
+      <tr>
+        <td>{{ dim.key }}</td>
+        <td>{{ '%.0f'|format(dim.weight * 100) }}%</td>
+        <td>{{ '%.0f'|format(dim.score) }}</td>
+        <td>{{ dim.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% else %}
+  <p>Not scored yet.</p>
+  {% endif %}
+
+  {% if opportunity.promotion_blockers %}
+  <p><strong>Not outreach-ready:</strong></p>
+  <ul>
+    {% for blocker in opportunity.promotion_blockers %}
+    <li>{{ blocker }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if opportunity.outreach_ready_override %}
+  <p><mark>Operator override: {{ opportunity.outreach_ready_override_reason }}</mark></p>
+  {% elif opportunity.status != 'outreach_ready' %}
+  <form method="post" action="/opportunities/{{ opportunity.id }}/override-outreach-ready">
+    <label>
+      Override to outreach-ready (reason required)
+      <input type="text" name="reason" required placeholder="Why promote despite blockers?">
+    </label>
+    <button type="submit">Override</button>
+  </form>
+  {% endif %}
+</article>
+
 <article>
   <header><strong>Problem or change</strong> <span class="label label-inference">inference</span></header>
   <p>{{ opportunity.problem_or_change }}</p>

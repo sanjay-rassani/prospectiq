@@ -1,18 +1,19 @@
-"""Opportunity detail routes."""
+"""Opportunity detail and outreach-ready override routes."""
 
 from __future__ import annotations
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_session
 from app.models import Opportunity, OpportunityEvidence
+from app.services.scoring.promotion import override_outreach_ready
 
 router = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -47,5 +48,32 @@ def opportunity_detail(
     return templates.TemplateResponse(
         request=request,
         name="opportunities/detail.html",
-        context={"title": opportunity.title, "opportunity": opportunity},
+        context={
+            "title": opportunity.title,
+            "opportunity": opportunity,
+            "flash": request.query_params.get("flash"),
+        },
+    )
+
+
+@router.post("/opportunities/{opportunity_id}/override-outreach-ready")
+def opportunity_override_outreach(
+    session: SessionDep,
+    opportunity_id: UUID,
+    reason: Annotated[str, Form()],
+) -> RedirectResponse:
+    opportunity = session.get(Opportunity, opportunity_id)
+    if opportunity is None:
+        return RedirectResponse(url="/companies?flash=Opportunity not found", status_code=303)
+    try:
+        override_outreach_ready(opportunity, reason)
+    except ValueError as exc:
+        return RedirectResponse(
+            url=f"/opportunities/{opportunity_id}?flash={exc}",
+            status_code=303,
+        )
+    session.flush()
+    return RedirectResponse(
+        url=f"/opportunities/{opportunity_id}?flash=Marked outreach-ready by override",
+        status_code=303,
     )

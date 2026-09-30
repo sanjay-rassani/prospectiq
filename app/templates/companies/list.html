@@ -23,6 +23,7 @@
       <th>Name</th>
       <th>Domain</th>
       <th>Status</th>
+      <th>ICP Fit</th>
       <th>Snapshots</th>
       <th>Last researched</th>
     </tr>
@@ -33,6 +34,12 @@
       <td><a href="/companies/{{ company.id }}">{{ company.name }}</a></td>
       <td><code>{{ company.domain }}</code></td>
       <td>{{ company.status }}</td>
+      <td>
+        {% if company.icp_score is not none %}
+        {{ '%.0f'|format(company.icp_score) }}
+        {% if company.priority %} <span class="band band-{{ company.priority }}">{{ company.priority }}</span>{% endif %}
+        {% else %}—{% endif %}
+      </td>
       <td>{{ snapshot_counts.get(company.id, 0) }}</td>
       <td>{{ company.last_researched_at or "—" }}</td>
     </tr>

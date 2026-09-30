@@ -52,7 +52,12 @@ def supersede_active_opportunities(session: Session, company: Company) -> int:
     rows = session.scalars(
         select(Opportunity).where(
             Opportunity.company_id == company.id,
-            Opportunity.status == OpportunityStatus.ACTIVE.value,
+            Opportunity.status.in_(
+                [
+                    OpportunityStatus.ACTIVE.value,
+                    OpportunityStatus.OUTREACH_READY.value,
+                ]
+            ),
         )
     ).all()
     for row in rows:

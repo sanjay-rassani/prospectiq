@@ -15,6 +15,8 @@
     <p>
       <code>{{ company.domain }}</code>
       · {{ company.status }}
+      {% if company.priority %} · ICP band <span class="band band-{{ company.priority }}">{{ company.priority }}</span>{% endif %}
+      {% if company.icp_score is not none %} · ICP Fit <strong>{{ '%.0f'|format(company.icp_score) }}</strong>{% endif %}
       {% if company.seed_url %} · <a href="{{ company.seed_url }}" target="_blank" rel="noopener">seed URL</a>{% endif %}
     </p>
   </div>
@@ -35,6 +37,40 @@
   <p>{{ company.last_error }}</p>
 </article>
 {% endif %}
+
+{% if company.exclusion_reason %}
+<article>
+  <header><strong>Excluded</strong></header>
+  <p>{{ company.exclusion_reason }}</p>
+</article>
+{% endif %}
+
+<article>
+  <header><strong>ICP Fit</strong> <small>(company-level — never uses timing signals)</small></header>
+  {% if company.icp_score is not none %}
+  <p>
+    Score <strong>{{ '%.1f'|format(company.icp_score) }}</strong>
+    {% if company.priority %} · band <span class="band band-{{ company.priority }}">{{ company.priority }}</span>{% endif %}
+  </p>
+  {% if company.icp_reasons_json and company.icp_reasons_json.dimensions %}
+  <table>
+    <thead><tr><th>Dimension</th><th>Weight</th><th>Score</th><th>Reason</th></tr></thead>
+    <tbody>
+      {% for dim in company.icp_reasons_json.dimensions %}
+      <tr>
+        <td>{{ dim.key }}</td>
+        <td>{{ '%.0f'|format(dim.weight * 100) }}%</td>
+        <td>{{ '%.0f'|format(dim.score) }}</td>
+        <td>{{ dim.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% else %}
+  <p>Not scored yet.</p>
+  {% endif %}
+</article>
 
 <article>
   <header><strong>Extracted facts</strong> <span class="label label-fact">observed</span></header>
@@ -132,14 +168,16 @@
 
 <article>
   <header><strong>Opportunities</strong> <span class="label label-hypothesis">hypothesis</span></header>
-  {% set active_opps = company.opportunities | selectattr('status', 'equalto', 'active') | list %}
+  {% set active_opps = company.opportunities | selectattr('status', 'in', ['active', 'outreach_ready']) | list %}
   {% if active_opps %}
   <table>
     <thead>
       <tr>
         <th>Title</th>
         <th>Family</th>
-        <th>Confidence</th>
+        <th>Opp. score</th>
+        <th>Band</th>
+        <th>Status</th>
         <th>Buyer</th>
       </tr>
     </thead>
@@ -148,7 +186,9 @@
       <tr>
         <td><a href="/opportunities/{{ opp.id }}">{{ opp.title }}</a></td>
         <td>{{ opp.solution_family }}</td>
-        <td>{{ opp.confidence }}</td>
+        <td>{% if opp.opportunity_score is not none %}{{ '%.0f'|format(opp.opportunity_score) }}{% else %}—{% endif %}</td>
+        <td>{% if opp.priority %}<span class="band band-{{ opp.priority }}">{{ opp.priority }}</span>{% else %}—{% endif %}</td>
+        <td>{{ opp.status }}</td>
         <td>{{ opp.buyer_role }}</td>
       </tr>
       {% endfor %}

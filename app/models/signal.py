@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,6 +35,7 @@ class SignalStrength(enum.StrEnum):
 
 class OpportunityStatus(enum.StrEnum):
     ACTIVE = "active"
+    OUTREACH_READY = "outreach_ready"
     SUPERSEDED = "superseded"
     REJECTED = "rejected"
     CLOSED = "closed"
@@ -106,6 +107,13 @@ class Opportunity(Base, TimestampMixin):
         String(32), nullable=False, default=OpportunityStatus.ACTIVE.value, index=True
     )
     unknowns: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    score_reasons_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    promotion_blockers: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
+    outreach_ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    outreach_ready_override: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
+    outreach_ready_override_reason: Mapped[str | None] = mapped_column(Text)
     # Snapshot that triggered this generation run (P4-9 change-triggered re-eval).
     triggering_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

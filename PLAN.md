@@ -202,24 +202,28 @@ opportunity detail pages label observed / inference / hypothesis. 43 tests passi
 Goal: rank honestly and explain why. **The spec gives weights but not inputs — that design work
 happens here.**
 
-- [ ] **P5-1** Operator profile storage (spec §2.1): positioning, capabilities, target industries
+- [x] **P5-1** Operator profile storage (spec §2.1): positioning, capabilities, target industries
       and regions, exclusions, commercial preferences. Start as a single settings row or YAML;
       the settings UI comes in Phase 9.
-- [ ] **P5-2** Define concrete, deterministic inputs for each ICP dimension (§8.1). Write them
+- [x] **P5-2** Define concrete, deterministic inputs for each ICP dimension (§8.1). Write them
       down before coding — this is where hidden judgement calls accumulate.
-- [ ] **P5-3** Implement ICP Fit. Assert in tests that **no timing/buying signal** can influence
+- [x] **P5-3** Implement ICP Fit. Assert in tests that **no timing/buying signal** can influence
       it (§8.1 explicitly forbids this).
-- [ ] **P5-4** Define inputs for each Opportunity Score dimension (§8.2), incl. how signal
+- [x] **P5-4** Define inputs for each Opportunity Score dimension (§8.2), incl. how signal
       recency maps to the timing component.
-- [ ] **P5-5** Implement Opportunity Score.
-- [ ] **P5-6** Human-readable score reasons per dimension, persisted alongside the number.
-- [ ] **P5-7** Priority bands (High / Medium / Watch / Reject) with configurable thresholds.
-- [ ] **P5-8** Exclusion rules: recruiters, staffing, do-not-contact, unwanted geo/industry.
-- [ ] **P5-9** `OUTREACH_READY` promotion gate per §7.2, with operator override + reason.
-- [ ] **P5-10** UI shows the two scores separately, never blended (AC-6).
+- [x] **P5-5** Implement Opportunity Score.
+- [x] **P5-6** Human-readable score reasons per dimension, persisted alongside the number.
+- [x] **P5-7** Priority bands (High / Medium / Watch / Reject) with configurable thresholds.
+- [x] **P5-8** Exclusion rules: recruiters, staffing, do-not-contact, unwanted geo/industry.
+- [x] **P5-9** `OUTREACH_READY` promotion gate per §7.2, with operator override + reason.
+- [x] **P5-10** UI shows the two scores separately, never blended (AC-6).
 
-**Milestone:** two companies with identical ICP Fit sit in different priority bands purely
-because one has fresh evidence.
+**Milestone reached.** Operator profile lives in `config/operator_profile.yaml`. ICP Fit and
+Opportunity Score use documented deterministic inputs (`INPUTS.md`); ICP is blind to timing
+signals. Scores and per-dimension reasons persist on company/opportunity rows. Exclusions
+block recruiters/staffing/do-not-contact/unwanted geo. High-band opportunities promote to
+`OUTREACH_READY` with an override path. UI shows ICP and Opportunity scores separately.
+48 tests passing.
 **Acceptance:** FR-05, FR-11, AC-6.
 
 ---

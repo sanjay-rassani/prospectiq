@@ -186,7 +186,14 @@ def test_opportunities_created_with_evidence_links(session: Session) -> None:
     assert outcomes[0].pipeline is not None
     assert gateway.opportunity_calls == 1
     opps = session.scalars(
-        select(Opportunity).where(Opportunity.status == OpportunityStatus.ACTIVE.value)
+        select(Opportunity).where(
+            Opportunity.status.in_(
+                [
+                    OpportunityStatus.ACTIVE.value,
+                    OpportunityStatus.OUTREACH_READY.value,
+                ]
+            )
+        )
     ).all()
     assert len(opps) == 1
     assert opps[0].title.startswith("Automate cross-site")
@@ -257,8 +264,8 @@ def test_change_reevaluates_and_supersedes_prior_opportunities(session: Session)
         session.execute(select(Opportunity.title, Opportunity.status)).all()
     )
     assert statuses[_good_hypothesis().title] == OpportunityStatus.SUPERSEDED.value
-    assert (
-        statuses["Unify depot ops data after process change"]
-        == OpportunityStatus.ACTIVE.value
-    )
+    assert statuses["Unify depot ops data after process change"] in {
+        OpportunityStatus.ACTIVE.value,
+        OpportunityStatus.OUTREACH_READY.value,
+    }
     assert session.scalar(select(func.count()).select_from(Opportunity)) == 2
