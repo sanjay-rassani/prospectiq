@@ -23,7 +23,6 @@ from typing import Any
 
 import httpx
 from pydantic import BaseModel, ValidationError
-
 from schemas import nuextract_template, strict_schema
 
 OLLAMA_URL = "http://127.0.0.1:11434"

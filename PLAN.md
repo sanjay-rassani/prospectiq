@@ -92,22 +92,28 @@ versions of two JSON schemas. The spike code is throwaway; the schemas are not.
 
 Goal: the app boots, talks to Postgres, and has migrations. No domain logic yet.
 
-- [ ] **P1-1** `git init`; `.gitignore` covering `.env`, `__pycache__`, `spike/`, `*.dump`.
-- [ ] **P1-2** Install uv; pin Python 3.12 (`.python-version`); create `pyproject.toml`.
-- [ ] **P1-3** Create the repo layout from spec §19 (`app/`, `app/services/*`, `migrations/`,
+- [x] **P1-1** `git init`; `.gitignore` covering `.env`, `__pycache__`, spike scratch, `*.dump`.
+- [x] **P1-2** Install uv; pin Python 3.12 (`.python-version`); create `pyproject.toml`.
+- [x] **P1-3** Create the repo layout from spec §19 (`app/`, `app/services/*`, `migrations/`,
       `tests/`) with package `__init__.py` files.
-- [ ] **P1-4** `docker-compose.yml` with Postgres 17, named volume, port bound to `127.0.0.1`
+- [x] **P1-4** `docker-compose.yml` with Postgres 17, named volume, port bound to `127.0.0.1`
       only. Ollama stays a host service (needs the CPU directly).
-- [ ] **P1-5** `app/config.py` with pydantic-settings; `.env.example` committed, `.env` ignored.
-- [ ] **P1-6** SQLAlchemy 2.x setup, sync engine + session factory. Sync is correct here — one
+- [x] **P1-5** `app/config.py` with pydantic-settings; `.env.example` committed, `.env` ignored.
+- [x] **P1-6** SQLAlchemy 2.x setup, sync engine + session factory. Sync is correct here — one
       operator, and async adds nothing but complexity.
-- [ ] **P1-7** Alembic initialised and pointed at the app's metadata.
-- [ ] **P1-8** FastAPI app with `/health` checking DB connectivity; bound to `127.0.0.1` (NFR §18).
-- [ ] **P1-9** Jinja2 + HTMX + Pico.css base template and shell layout.
-- [ ] **P1-10** ruff + mypy config; pytest with a throwaway test DB fixture.
-- [ ] **P1-11** `README.md`: setup from zero, no paid credentials (AC-1).
+- [x] **P1-7** Alembic initialised and pointed at the app's metadata, with the URL read from
+      settings so credentials live only in `.env`.
+- [x] **P1-8** FastAPI app with `/health` checking DB connectivity; bound to `127.0.0.1` (NFR §18).
+- [x] **P1-9** Jinja2 + HTMX + Pico.css base template and shell layout. Both assets vendored
+      into `app/static` rather than loaded from a CDN (decision D-13).
+- [x] **P1-10** ruff + mypy config; pytest with a per-session test database.
+- [x] **P1-11** `README.md`: setup from zero, no paid credentials (AC-1).
 
-**Milestone:** `docker compose up`, run the app, `/health` is green, one migration applied.
+**Milestone reached.** `docker compose up` brings up Postgres 17, `alembic upgrade head`
+applies the baseline revision, `/health` returns `{"status":"ok","database":"ok"}`, and the
+Today page renders with vendored assets. Verified that stopping Postgres flips `/health` to
+`degraded` and restarting it recovers without an app restart, so the check is meaningful
+and `pool_pre_ping` works. ruff and mypy clean, 4 tests passing.
 
 ---
 
@@ -328,3 +334,7 @@ Record as we go, with reasoning. Seeded with what's already settled:
 | D-10 | NuExtract templates derived from the same Pydantic models | One source of truth; the two wire formats cannot drift |
 | D-11 | `num_ctx` 8192, not the model default 131072 | KV cache at 131k would not fit in available RAM |
 | D-12 | Negative-evidence citation blocked deterministically, not just by prompt | Job-hunting drift is the spec's primary failure mode |
+| D-13 | Pico.css and HTMX vendored, not CDN-loaded | UI must work offline and depend on no third-party service |
+| D-14 | Alembic URL from `app.config`, `alembic.ini` left blank | One place for credentials; migrations cannot target a different database than the app |
+| D-15 | Tests build schema from `Base.metadata`, not by replaying migrations | Fast suite; migration correctness verified separately against the real database |
+| D-16 | `psycopg` 3 over `psycopg2` | Current driver, actively maintained, first-class SQLAlchemy 2.x support |

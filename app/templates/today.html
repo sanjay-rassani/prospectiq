@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% set active = 'today' %}
+
+{% block content %}
+<h1>Today</h1>
+
+{# The three questions this screen answers, per spec section 16. Wired up in Phase 8;
+   until then the empty states document what belongs here. #}
+<article>
+  <header><strong>High-priority opportunities</strong></header>
+  <p>Nothing yet. Seed a company to begin.</p>
+</article>
+
+<article>
+  <header><strong>Outreach and follow-ups due</strong></header>
+  <p>Nothing due.</p>
+</article>
+
+<article>
+  <header><strong>Newly changed prospects</strong></header>
+  <p>No changes detected.</p>
+</article>
+{% endblock %}

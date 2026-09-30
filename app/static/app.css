@@ -1,0 +1,31 @@
+/* Small overrides on top of Pico. Kept deliberately short: this is a personal tool and a
+   large stylesheet would be a maintenance cost with no user-facing benefit. */
+
+:root {
+  --pico-font-size: 95%;
+  --pico-form-element-spacing-vertical: 0.5rem;
+}
+
+/* Priority bands from spec section 8.2. Scores are prioritisation aids, so the colour is
+   a hint and the visible score reason is the real explanation. */
+.band { font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 0.25rem; }
+.band-high   { background: #d1372e; color: #fff; }
+.band-medium { background: #b8860b; color: #fff; }
+.band-watch  { background: #4a6fa5; color: #fff; }
+.band-reject { background: #6c757d; color: #fff; }
+
+/* Evidence labelling (spec section 6.2): observed fact, inference, and hypothesis must be
+   visually distinguishable so a guess is never mistaken for a finding. */
+.label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.label-fact       { color: #2d6a4f; }
+.label-inference  { color: #b8860b; }
+.label-hypothesis { color: #8b5cf6; }
+
+.evidence {
+  border-left: 3px solid var(--pico-muted-border-color);
+  padding-left: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--pico-muted-color);
+}
+
+article header { margin-bottom: 0.5rem; }

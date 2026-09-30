@@ -1,0 +1,34 @@
+{# Pico.css and HTMX are vendored in app/static rather than loaded from a CDN, so the UI
+   works with no internet connection and no third-party service (spec section 18). #}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ title }}{% endblock %} &middot; Prospecting Engine</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/pico.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
+  <script src="{{ url_for('static', path='/htmx.min.js') }}" defer></script>
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul><li><strong>Prospecting Engine</strong></li></ul>
+      <ul>
+        <li><a href="/" {% if active == 'today' %}aria-current="page"{% endif %}>Today</a></li>
+        <li><a href="/companies" {% if active == 'companies' %}aria-current="page"{% endif %}>Companies</a></li>
+        <li><a href="/outreach" {% if active == 'outreach' %}aria-current="page"{% endif %}>Outreach</a></li>
+        <li><a href="/settings" {% if active == 'settings' %}aria-current="page"{% endif %}>Settings</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="container">
+    <small>Local-only. Research and drafts are suggestions; you decide and you send.</small>
+  </footer>
+</body>
+</html>

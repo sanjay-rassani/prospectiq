@@ -122,7 +122,8 @@ def main() -> int:
                     )
             # Invented numbers are forbidden by spec section 7.1; flag for human reading
             # rather than failing, since a figure quoted from the page is legitimate.
-            if re.search(r"\d+\s*(%|percent|x\b|hours|days|weeks)", opp.get("business_outcome", "")):
+            outcome = opp.get("business_outcome", "")
+            if re.search(r"\d+\s*(%|percent|x\b|hours|days|weeks)", outcome):
                 numeric_claims.append((slug, opp["business_outcome"][:140]))
             review.append({"slug": slug, "label": label, "opp": opp})
 
