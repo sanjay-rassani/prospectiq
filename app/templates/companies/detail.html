@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% set active = 'companies' %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ul>
+    <li><a href="/companies">Companies</a></li>
+    <li>{{ company.name }}</li>
+  </ul>
+</nav>
+
+<header class="row">
+  <div>
+    <h1>{{ company.name }}</h1>
+    <p>
+      <code>{{ company.domain }}</code>
+      · {{ company.status }}
+      {% if company.seed_url %} · <a href="{{ company.seed_url }}" target="_blank" rel="noopener">seed URL</a>{% endif %}
+    </p>
+  </div>
+  <div>
+    <form method="post" action="/companies/{{ company.id }}/refresh">
+      <button type="submit">Refresh now</button>
+    </form>
+  </div>
+</header>
+
+{% if flash %}
+<p><mark>{{ flash }}</mark></p>
+{% endif %}
+
+{% if company.last_error %}
+<article>
+  <header><strong>Last error</strong></header>
+  <p>{{ company.last_error }}</p>
+</article>
+{% endif %}
+
+<article>
+  <header><strong>Source snapshots</strong></header>
+  {% if company.snapshots %}
+  <table>
+    <thead>
+      <tr>
+        <th>Fetched</th>
+        <th>Type</th>
+        <th>Title</th>
+        <th>HTTP</th>
+        <th>Hash</th>
+        <th>Changed from</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for snap in company.snapshots %}
+      <tr>
+        <td>{{ snap.fetched_at }}</td>
+        <td>{{ snap.source_type }}</td>
+        <td>
+          <a href="#snap-{{ snap.id }}">{{ snap.title or snap.url }}</a>
+        </td>
+        <td>{{ snap.http_status or "—" }}</td>
+        <td><code title="{{ snap.content_hash }}">{{ snap.content_hash[:10] }}…</code></td>
+        <td>
+          {% if snap.previous_hash %}
+          <code title="{{ snap.previous_hash }}">{{ snap.previous_hash[:10] }}…</code>
+          {% else %}
+          —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% for snap in company.snapshots %}
+  <section id="snap-{{ snap.id }}">
+    <h3>{{ snap.title or snap.url }}</h3>
+    <p>
+      <small>
+        {{ snap.url }} · {{ snap.fetched_at }}
+        {% if snap.published_at %} · published {{ snap.published_at }}{% endif %}
+        · {{ snap.text|length }} chars
+      </small>
+    </p>
+    <blockquote class="evidence">{{ snap.text[:2000] }}{% if snap.text|length > 2000 %}…{% endif %}</blockquote>
+  </section>
+  {% endfor %}
+  {% else %}
+  <p>No snapshots yet. Use <em>Refresh now</em> or re-seed this domain.</p>
+  {% endif %}
+</article>
+{% endblock %}

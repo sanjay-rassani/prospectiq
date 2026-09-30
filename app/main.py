@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.api.companies import router as companies_router
 from app.config import get_settings
 from app.db.session import get_session
 
@@ -39,6 +40,9 @@ app = FastAPI(
 
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+app.state.templates = templates
+
+app.include_router(companies_router)
 
 
 @app.get("/health")

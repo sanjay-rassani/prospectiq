@@ -121,23 +121,26 @@ and `pool_pre_ping` works. ruff and mypy clean, 4 tests passing.
 
 Goal: paste a domain, get durable evidence. This is the foundation everything else reads from.
 
-- [ ] **P2-1** `Company` model per spec §13 + normalized-domain unique index.
-- [ ] **P2-2** Domain normalization helper: strip scheme, `www.`, trailing slash, lowercase,
+- [x] **P2-1** `Company` model per spec §13 + normalized-domain unique index.
+- [x] **P2-2** Domain normalization helper: strip scheme, `www.`, trailing slash, lowercase,
       handle subdomains. Unit-test it hard — dedup correctness (FR-02) lives here.
-- [ ] **P2-3** `SourceSnapshot` model incl. `content_hash`, `previous_hash`, `published_at`.
-- [ ] **P2-4** Fetcher: httpx with timeouts, per-domain rate limit, global concurrency cap,
+- [x] **P2-3** `SourceSnapshot` model incl. `content_hash`, `previous_hash`, `published_at`.
+- [x] **P2-4** Fetcher: httpx with timeouts, per-domain rate limit, global concurrency cap,
       identifying user-agent, conditional requests via ETag/Last-Modified (§11).
-- [ ] **P2-5** `robots.txt` check and cache before any fetch.
-- [ ] **P2-6** Content extraction with trafilatura → text, title, `published_at`.
-- [ ] **P2-7** Hash the *extracted text*, not raw HTML — raw HTML churns on every request
+- [x] **P2-5** `robots.txt` check and cache before any fetch.
+- [x] **P2-6** Content extraction with trafilatura → text, title, `published_at`.
+- [x] **P2-7** Hash the *extracted text*, not raw HTML — raw HTML churns on every request
       (nonces, timestamps, CSRF tokens) and would defeat change detection.
-- [ ] **P2-8** Manual-seed adapter: accept name / domain / URL / pasted list (FR-01).
-- [ ] **P2-9** Company-page adapter: re-fetch known URLs, diff against `previous_hash`.
-- [ ] **P2-10** UI: seed form, company list, company detail showing snapshot history.
-- [ ] **P2-11** Tests with recorded HTTP fixtures: new snapshot, unchanged content, 304, 404,
+- [x] **P2-8** Manual-seed adapter: accept name / domain / URL / pasted list (FR-01).
+- [x] **P2-9** Company-page adapter: re-fetch known URLs, diff against `previous_hash`.
+- [x] **P2-10** UI: seed form, company list, company detail showing snapshot history.
+- [x] **P2-11** Tests with recorded HTTP fixtures: new snapshot, unchanged content, 304, 404,
       redirect chain, timeout.
 
-**Milestone:** paste a domain → snapshot stored with hash → re-fetch creates no duplicate row.
+**Milestone reached.** Paste a domain → snapshot stored with hash → re-fetch creates no
+duplicate row. Verified live against `example.com`: first seed stored one snapshot; second
+seed of the same domain returned `unchanged; no new snapshot` with still one row in
+`source_snapshots`. 34 tests passing (normalize, fetcher fixtures, seed/refresh).
 **Acceptance:** FR-01, FR-02, FR-03, AC-2, AC-3.
 
 ---
@@ -338,3 +341,6 @@ Record as we go, with reasoning. Seeded with what's already settled:
 | D-14 | Alembic URL from `app.config`, `alembic.ini` left blank | One place for credentials; migrations cannot target a different database than the app |
 | D-15 | Tests build schema from `Base.metadata`, not by replaying migrations | Fast suite; migration correctness verified separately against the real database |
 | D-16 | `psycopg` 3 over `psycopg2` | Current driver, actively maintained, first-class SQLAlchemy 2.x support |
+| D-17 | Hash extracted text; skip insert when hash matches latest | Raw HTML churn would defeat change detection; AC-3 requires no duplicate work |
+| D-18 | robots.txt fail-open on fetch errors | Broken robots endpoint must not permanently block an explicitly seeded public page |
+| D-19 | Keep meaningful subdomains (`blog.x.com` ≠ `x.com`) | Over-collapsing would merge distinct properties; only strip `www` |

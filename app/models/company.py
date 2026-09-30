@@ -1,0 +1,91 @@
+"""Company and source-snapshot ORM models (spec section 13)."""
+
+from __future__ import annotations
+
+import enum
+import uuid
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base import Base, TimestampMixin
+
+
+class CompanyStatus(enum.StrEnum):
+    """Lifecycle stage for a company. Expanded in later phases; Phase 2 only seeds."""
+
+    SEEDED = "seeded"
+    RESEARCHED = "researched"
+    QUALIFIED = "qualified"
+    WATCH = "watch"
+    NURTURE = "nurture"
+    DISQUALIFIED = "disqualified"
+    CLOSED = "closed"
+
+
+class SourceType(enum.StrEnum):
+    MANUAL_SEED = "manual_seed"
+    COMPANY_PAGE = "company_page"
+    RSS = "rss"
+    DIRECTORY = "directory"
+    TECHNICAL = "technical"
+
+
+class Company(Base, TimestampMixin):
+    __tablename__ = "companies"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Dedup key (FR-02). Always store the output of normalize_domain().
+    domain: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text)
+    industry: Mapped[str | None] = mapped_column(String(255))
+    size_hint: Mapped[str | None] = mapped_column(String(64))
+    geography: Mapped[str | None] = mapped_column(String(255))
+    icp_score: Mapped[float | None] = mapped_column(Float)
+    priority: Mapped[str | None] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default=CompanyStatus.SEEDED.value
+    )
+    last_researched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_refresh_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    seed_url: Mapped[str | None] = mapped_column(String(2048))
+    last_error: Mapped[str | None] = mapped_column(Text)
+
+    snapshots: Mapped[list[SourceSnapshot]] = relationship(
+        back_populates="company",
+        cascade="all, delete-orphan",
+        order_by="desc(SourceSnapshot.fetched_at)",
+    )
+
+
+class SourceSnapshot(Base, TimestampMixin):
+    __tablename__ = "source_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    http_status: Mapped[int | None] = mapped_column(Integer)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    previous_hash: Mapped[str | None] = mapped_column(String(64))
+    title: Mapped[str | None] = mapped_column(String(512))
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    # etag, last_modified, extractor notes, final_url after redirects, etc.
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+
+    company: Mapped[Company] = relationship(back_populates="snapshots")

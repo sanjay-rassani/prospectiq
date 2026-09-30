@@ -29,3 +29,20 @@
 }
 
 article header { margin-bottom: 0.5rem; }
+
+header.row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+header.row h1 { margin-bottom: 0.25rem; }
+
+mark {
+  display: inline-block;
+  padding: 0.35rem 0.6rem;
+  margin-bottom: 1rem;
+}

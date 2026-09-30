@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% set active = 'companies' %}
+
+{% block content %}
+<header class="row">
+  <div>
+    <h1>Companies</h1>
+    <p>Seeded and monitored companies. Deduplicated by normalized domain.</p>
+  </div>
+  <div>
+    <a href="/companies/seed" role="button">Seed companies</a>
+  </div>
+</header>
+
+{% if flash %}
+<p><mark>{{ flash }}</mark></p>
+{% endif %}
+
+{% if companies %}
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Domain</th>
+      <th>Status</th>
+      <th>Snapshots</th>
+      <th>Last researched</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for company in companies %}
+    <tr>
+      <td><a href="/companies/{{ company.id }}">{{ company.name }}</a></td>
+      <td><code>{{ company.domain }}</code></td>
+      <td>{{ company.status }}</td>
+      <td>{{ snapshot_counts.get(company.id, 0) }}</td>
+      <td>{{ company.last_researched_at or "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<article>
+  <p>No companies yet. <a href="/companies/seed">Seed a domain or URL</a> to begin.</p>
+</article>
+{% endif %}
+{% endblock %}
