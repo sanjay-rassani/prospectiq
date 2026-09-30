@@ -13,6 +13,7 @@ from app.services.discovery.seed import refresh_company, seed_targets
 from app.services.fetcher import Fetcher
 from app.services.llm.gateway import CallResult
 from app.services.llm.schemas import (
+    BuyerRoleRecommendation,
     CompanyFacts,
     Confidence,
     CustomerType,
@@ -38,9 +39,11 @@ class FakeGateway:
     fact_calls: int = 0
     signal_calls: int = 0
     opportunity_calls: int = 0
+    buyer_role_calls: int = 0
     facts: CompanyFacts | None = None
     signal_list: SignalList | None = None
     opportunity_list: OpportunityList | None = None
+    buyer_role: BuyerRoleRecommendation | None = None
     fail: bool = False
     seen_texts: list[str] = field(default_factory=list)
 
@@ -115,6 +118,24 @@ class FakeGateway:
             model="fake",
             prompt_version="v1",
             task="generate_opportunities",
+            seconds=0.01,
+            attempts=1,
+        )
+
+    def recommend_buyer_role(self, *, opportunity_json: str) -> CallResult:
+        self.calls += 1
+        self.buyer_role_calls += 1
+        parsed = self.buyer_role or BuyerRoleRecommendation(
+            role="COO",
+            rationale="Operations ownership for automation work.",
+        )
+        return CallResult(
+            ok=True,
+            parsed=parsed,
+            raw_output=parsed.model_dump_json(),
+            model="fake",
+            prompt_version="v1",
+            task="recommend_buyer_role",
             seconds=0.01,
             attempts=1,
         )

@@ -3,6 +3,12 @@
 from app.db.base import Base, TimestampMixin
 from app.models.company import Company, CompanyStatus, SourceSnapshot, SourceType
 from app.models.llm_call import LlmCall
+from app.models.person import (
+    Person,
+    PersonSource,
+    ResearchTask,
+    ResearchTaskStatus,
+)
 from app.models.signal import (
     Opportunity,
     OpportunityEvidence,
@@ -21,6 +27,10 @@ __all__ = [
     "Opportunity",
     "OpportunityEvidence",
     "OpportunityStatus",
+    "Person",
+    "PersonSource",
+    "ResearchTask",
+    "ResearchTaskStatus",
     "Signal",
     "SignalStrength",
     "SignalType",

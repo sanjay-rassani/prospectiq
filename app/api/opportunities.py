@@ -12,7 +12,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_session
-from app.models import Opportunity, OpportunityEvidence
+from app.models import (
+    Company,
+    Opportunity,
+    OpportunityEvidence,
+    ResearchTask,
+    ResearchTaskStatus,
+)
+from app.services.buyers.research_tasks import find_person_for_role
 from app.services.scoring.promotion import override_outreach_ready
 
 router = APIRouter()
@@ -34,8 +41,9 @@ def opportunity_detail(
         select(Opportunity)
         .where(Opportunity.id == opportunity_id)
         .options(
-            selectinload(Opportunity.company),
+            selectinload(Opportunity.company).selectinload(Company.people),
             selectinload(Opportunity.evidence_links).selectinload(OpportunityEvidence.signal),
+            selectinload(Opportunity.research_tasks),
         )
     )
     if opportunity is None:
@@ -45,12 +53,21 @@ def opportunity_detail(
             context={"title": "Not found"},
             status_code=404,
         )
+    matching_people = []
+    if opportunity.buyer_role:
+        match = find_person_for_role(list(opportunity.company.people), opportunity.buyer_role)
+        matching_people = [match] if match else []
+    open_tasks = [
+        t for t in opportunity.research_tasks if t.status == ResearchTaskStatus.OPEN.value
+    ]
     return templates.TemplateResponse(
         request=request,
         name="opportunities/detail.html",
         context={
             "title": opportunity.title,
             "opportunity": opportunity,
+            "matching_people": matching_people,
+            "open_research_tasks": open_tasks,
             "flash": request.query_params.get("flash"),
         },
     )
@@ -75,5 +92,21 @@ def opportunity_override_outreach(
     session.flush()
     return RedirectResponse(
         url=f"/opportunities/{opportunity_id}?flash=Marked outreach-ready by override",
+        status_code=303,
+    )
+
+
+@router.post("/research-tasks/{task_id}/done")
+def research_task_done(
+    session: SessionDep,
+    task_id: UUID,
+) -> RedirectResponse:
+    task = session.get(ResearchTask, task_id)
+    if task is None:
+        return RedirectResponse(url="/companies?flash=Research task not found", status_code=303)
+    task.status = ResearchTaskStatus.DONE.value
+    session.flush()
+    return RedirectResponse(
+        url=f"/opportunities/{task.opportunity_id}?flash=Research task marked done",
         status_code=303,
     )

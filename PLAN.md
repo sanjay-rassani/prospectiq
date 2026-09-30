@@ -232,16 +232,20 @@ block recruiters/staffing/do-not-contact/unwanted geo. High-band opportunities p
 
 Goal: know who to talk to without crossing the scraping line.
 
-- [ ] **P6-1** `Person` model (nullable email, `source`, `verified_at`).
-- [ ] **P6-2** Deterministic opportunity→role mapping table from §9.1.
-- [ ] **P6-3** `recommend_buyer_role` for nuance, constrained to the mapping's vocabulary.
-- [ ] **P6-4** Person capture from permitted public pages (team/about/contact) only.
-- [ ] **P6-5** Manual research task generator — "Find Head of Operations on LinkedIn" — when no
+- [x] **P6-1** `Person` model (nullable email, `source`, `verified_at`).
+- [x] **P6-2** Deterministic opportunity→role mapping table from §9.1.
+- [x] **P6-3** `recommend_buyer_role` for nuance, constrained to the mapping's vocabulary.
+- [x] **P6-4** Person capture from permitted public pages (team/about/contact) only.
+- [x] **P6-5** Manual research task generator — "Find Head of Operations on LinkedIn" — when no
       reliable person exists (§9.2).
-- [ ] **P6-6** Hard guardrails: no LinkedIn scraping, no email pattern guessing. Enforce in code
+- [x] **P6-6** Hard guardrails: no LinkedIn scraping, no email pattern guessing. Enforce in code
       and state it in the README so future-you doesn't "improve" it.
-- [ ] **P6-7** UI: people on company detail, role recommendation on opportunity detail.
+- [x] **P6-7** UI: people on company detail, role recommendation on opportunity detail.
 
+**Milestone reached.** §9.1 role map drives `recommend_buyer_role` (LLM clamped to vocabulary,
+deterministic fallback). People are captured only from about/team/contact snapshots or manual
+entry. Missing contacts open a research task; LinkedIn fetch and name+domain email guessing
+are rejected in code and documented in the README. 57 tests passing.
 **Acceptance:** FR-07.
 
 ---

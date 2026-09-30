@@ -15,6 +15,7 @@ from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.company import Company, SourceSnapshot
+    from app.models.person import ResearchTask
 
 
 class SignalType(enum.StrEnum):
@@ -100,6 +101,7 @@ class Opportunity(Base, TimestampMixin):
     business_outcome: Mapped[str] = mapped_column(Text, nullable=False)
     why_now: Mapped[str] = mapped_column(Text, nullable=False)
     buyer_role: Mapped[str] = mapped_column(String(255), nullable=False)
+    buyer_role_rationale: Mapped[str | None] = mapped_column(Text)
     confidence: Mapped[str] = mapped_column(String(32), nullable=False)
     opportunity_score: Mapped[float | None] = mapped_column(Float)
     priority: Mapped[str | None] = mapped_column(String(32))
@@ -123,6 +125,10 @@ class Opportunity(Base, TimestampMixin):
 
     company: Mapped[Company] = relationship(back_populates="opportunities")
     evidence_links: Mapped[list[OpportunityEvidence]] = relationship(
+        back_populates="opportunity",
+        cascade="all, delete-orphan",
+    )
+    research_tasks: Mapped[list[ResearchTask]] = relationship(
         back_populates="opportunity",
         cascade="all, delete-orphan",
     )

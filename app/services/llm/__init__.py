@@ -2,7 +2,6 @@
 
 from app.services.llm.facts import extract_company_facts
 from app.services.llm.gateway import CallResult, LlmGateway, OllamaGateway
-from app.services.llm.pipeline import process_new_snapshot
 from app.services.llm.schemas import CompanyFacts
 
 __all__ = [
@@ -11,5 +10,4 @@ __all__ = [
     "LlmGateway",
     "OllamaGateway",
     "extract_company_facts",
-    "process_new_snapshot",
 ]

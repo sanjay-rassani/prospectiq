@@ -92,6 +92,19 @@ full-stack product delivery.
 
 Return JSON matching the provided schema."""
 
+RECOMMEND_BUYER_ROLE_SYSTEM = """\
+You recommend the single best buyer ROLE for one project opportunity.
+
+Rules:
+- Pick EXACTLY one role from the `allowed_roles` list in the user payload. Copy it
+  character-for-character. Do not invent a new title.
+- Prefer the person most likely to own the problem AND its budget.
+- For small/solo companies, prefer Founder/CEO when that role is allowed.
+- Do not invent a named person. Role only.
+- Keep the rationale to one or two sentences grounded in the opportunity and company size.
+
+Return JSON matching the provided schema."""
+
 
 def facts_user_prompt(url: str, text: str) -> str:
     return f"Source URL: {url}\n\n<source_text>\n{text}\n</source_text>"
@@ -114,4 +127,11 @@ def opportunities_user_prompt(facts_json: str, signals_json: str) -> str:
         f"Company facts:\n{facts_json}\n\n"
         f"Signals (indexes are zero-based, cite them in supporting_signal_indexes):\n"
         f"{signals_json}"
+    )
+
+
+def buyer_role_user_prompt(opportunity_json: str) -> str:
+    return (
+        "Select the best buyer role from allowed_roles for this opportunity.\n\n"
+        f"{opportunity_json}"
     )

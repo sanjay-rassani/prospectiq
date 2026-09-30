@@ -108,6 +108,37 @@
 <article>
   <header><strong>Buyer role</strong></header>
   <p>{{ opportunity.buyer_role }}</p>
+  {% if opportunity.buyer_role_rationale %}
+  <p><small>{{ opportunity.buyer_role_rationale }}</small></p>
+  {% endif %}
+  {% if matching_people %}
+  <p><strong>Matching people</strong></p>
+  <ul>
+    {% for person in matching_people %}
+    <li>
+      {{ person.name }} — {{ person.role }}
+      {% if person.public_email %} · {{ person.public_email }}{% endif %}
+      {% if person.public_profile_url %}
+      · <a href="{{ person.public_profile_url }}" target="_blank" rel="noopener">profile</a>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if open_research_tasks %}
+  <p><strong>Manual research</strong></p>
+  <ul>
+    {% for task in open_research_tasks %}
+    <li>
+      {{ task.title }}
+      <form method="post" action="/research-tasks/{{ task.id }}/done" style="display:inline">
+        <button type="submit" class="outline">Mark done</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  <p><small>LinkedIn research is human-operated. The system never scrapes LinkedIn or guesses emails.</small></p>
+  {% endif %}
 </article>
 
 <article>

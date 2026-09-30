@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import Company, Opportunity, Signal, SourceSnapshot
+from app.services.buyers.service import process_buyers_for_company
 from app.services.llm.facts import extract_company_facts
 from app.services.llm.gateway import LlmGateway
 from app.services.llm.opportunities import (
@@ -28,6 +29,7 @@ class PipelineResult:
     signals_dropped: int = 0
     opportunities: list[Opportunity] = field(default_factory=list)
     scored: bool = False
+    buyers: bool = False
 
     @property
     def summary(self) -> str:
@@ -42,6 +44,8 @@ class PipelineResult:
             parts.append(f"{len(self.opportunities)} opportunities")
         if self.scored:
             parts.append("scored")
+        if self.buyers:
+            parts.append("buyers")
         return "; ".join(parts) if parts else "no LLM output"
 
 
@@ -51,7 +55,7 @@ def process_new_snapshot(
     snapshot: SourceSnapshot,
     gateway: LlmGateway | None = None,
 ) -> PipelineResult | None:
-    """Run the Phase 3-5 research chain for a newly stored snapshot only.
+    """Run the Phase 3-6 research chain for a newly stored snapshot only.
 
     Unchanged re-fetches must never call this (AC-3 / P3-6).
     """
@@ -80,5 +84,10 @@ def process_new_snapshot(
     # Phase 5: always recompute ICP after facts; score opportunities when present.
     score_company_and_opportunities(session, company)
     result.scored = True
+
+    # Phase 6: role recommendation, permitted-page person capture, research tasks.
+    # Deterministic path runs even without a gateway (role map + page capture).
+    process_buyers_for_company(session, company, gateway=gateway)
+    result.buyers = True
 
     return result

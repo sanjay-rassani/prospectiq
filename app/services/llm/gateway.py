@@ -52,6 +52,8 @@ class LlmGateway(Protocol):
         self, *, facts_json: str, signals_json: str
     ) -> CallResult: ...
 
+    def recommend_buyer_role(self, *, opportunity_json: str) -> CallResult: ...
+
 
 class OllamaGateway:
     """Production gateway talking to a local Ollama instance."""
@@ -139,6 +141,19 @@ class OllamaGateway:
             output_model=OpportunityList,
             prompt_version=prompts.PROMPT_VERSION,
             task="generate_opportunities",
+        )
+
+    def recommend_buyer_role(self, *, opportunity_json: str) -> CallResult:
+        from app.services.llm import prompts
+        from app.services.llm.schemas import BuyerRoleRecommendation
+
+        return self.call_schema(
+            model=self.settings.generation_model,
+            system=prompts.RECOMMEND_BUYER_ROLE_SYSTEM,
+            user=prompts.buyer_role_user_prompt(opportunity_json),
+            output_model=BuyerRoleRecommendation,
+            prompt_version=prompts.PROMPT_VERSION,
+            task="recommend_buyer_role",
         )
 
     def call_schema(

@@ -157,6 +157,13 @@ class OpportunityList(BaseModel):
     no_opportunity_reason: str | None
 
 
+class BuyerRoleRecommendation(BaseModel):
+    """Spec §15.1 recommend_buyer_role. `role` must be from the caller's allowed list."""
+
+    role: str = Field(description="Exactly one role from the provided allowed_roles list.")
+    rationale: str = Field(description="One or two sentences explaining the choice.")
+
+
 def strict_schema(model: type[BaseModel]) -> dict[str, Any]:
     """JSON Schema tightened for Ollama grammar-constrained decoding."""
     schema = model.model_json_schema()

@@ -211,6 +211,67 @@
 </article>
 
 <article>
+  <header><strong>People</strong></header>
+  {% if company.people %}
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Role</th>
+        <th>Email</th>
+        <th>Source</th>
+        <th>Profile</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for person in company.people %}
+      <tr>
+        <td>{{ person.name }}</td>
+        <td>{{ person.role }}</td>
+        <td>{{ person.public_email or "—" }}</td>
+        <td>{{ person.source }}</td>
+        <td>
+          {% if person.public_profile_url %}
+          <a href="{{ person.public_profile_url }}" target="_blank" rel="noopener">link</a>
+          {% else %}
+          —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No people yet. Captured only from about/team/contact pages, or added manually below.</p>
+  {% endif %}
+
+  {% set open_research = company.research_tasks | selectattr('status', 'equalto', 'open') | list %}
+  {% if open_research %}
+  <p><strong>Open research tasks</strong></p>
+  <ul>
+    {% for task in open_research %}
+    <li>
+      {{ task.title }}
+      · <a href="/opportunities/{{ task.opportunity_id }}">opportunity</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <form method="post" action="/companies/{{ company.id }}/people">
+    <fieldset>
+      <legend>Add person (manual research)</legend>
+      <label>Name <input type="text" name="name" required></label>
+      <label>Role <input type="text" name="role" required placeholder="Head of Operations"></label>
+      <label>Public email <input type="email" name="public_email" placeholder="optional — never guessed"></label>
+      <label>Public profile URL <input type="url" name="public_profile_url" placeholder="optional — paste LinkedIn URL after manual research"></label>
+      <button type="submit">Save person</button>
+    </fieldset>
+  </form>
+  <p><small>No LinkedIn scraping. No email pattern guessing. Paste only what you found yourself.</small></p>
+</article>
+
+<article>
   <header><strong>Source snapshots</strong></header>
   {% if company.snapshots %}
   <table>

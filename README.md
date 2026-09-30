@@ -91,7 +91,10 @@ on CPU. All model work is background jobs, and unchanged pages are never re-sent
 model — that skip is what makes ongoing operation affordable.
 
 **No LinkedIn automation, ever.** The engine recommends a buyer *role* and files a manual
-research task. It does not scrape LinkedIn and does not guess email addresses.
+research task such as “Find Head of Operations on LinkedIn.” It does not scrape LinkedIn,
+does not fetch linkedin.com, and does not guess email addresses from name+domain patterns.
+People are captured only from permitted public company pages (about/team/contact) or entered
+manually by the operator.
 
 ## Security
 

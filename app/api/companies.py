@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_session
 from app.models import Company, SourceSnapshot
+from app.services.buyers.capture import add_manual_person
 from app.services.discovery.seed import refresh_company, seed_targets
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,8 @@ def company_detail(
             selectinload(Company.snapshots),
             selectinload(Company.signals),
             selectinload(Company.opportunities),
+            selectinload(Company.people),
+            selectinload(Company.research_tasks),
         )
     )
     if company is None:
@@ -151,5 +154,37 @@ def company_refresh(
         )
     return RedirectResponse(
         url=f"/companies/{company_id}?flash={outcome.message}",
+        status_code=303,
+    )
+
+
+@router.post("/companies/{company_id}/people")
+def company_add_person(
+    session: SessionDep,
+    company_id: UUID,
+    name: Annotated[str, Form()],
+    role: Annotated[str, Form()],
+    public_email: Annotated[str, Form()] = "",
+    public_profile_url: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    company = session.get(Company, company_id)
+    if company is None:
+        return RedirectResponse(url="/companies?flash=Company not found", status_code=303)
+    try:
+        person = add_manual_person(
+            session,
+            company,
+            name=name,
+            role=role,
+            public_email=public_email or None,
+            public_profile_url=public_profile_url or None,
+        )
+    except ValueError as exc:
+        return RedirectResponse(
+            url=f"/companies/{company_id}?flash={exc}",
+            status_code=303,
+        )
+    return RedirectResponse(
+        url=f"/companies/{company_id}?flash=Added {person.name}",
         status_code=303,
     )
