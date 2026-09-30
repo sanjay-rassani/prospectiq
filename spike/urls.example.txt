@@ -1,0 +1,15 @@
+# Sample pages for the Phase 0 spike. Copy to urls.txt and replace with real targets.
+# Format: URL, whitespace, label. Labels: normal | dud | recruiter
+#
+# Prefer pages where something is HAPPENING over bare homepages: launch announcements,
+# expansion news, blog posts describing an operational problem, product changelogs.
+
+# --- normal: companies you'd genuinely want as clients (aim for 6-7) ---
+https://example-company.com/blog/launching-our-new-platform    normal
+https://example-company.com/about                              normal
+
+# --- dud: real business, vague marketing site, nothing actionable (1-2) ---
+https://example-vague-corp.com                                 dud
+
+# --- recruiter: must be rejected as an excluded target (1) ---
+https://example-staffing-agency.com                            recruiter

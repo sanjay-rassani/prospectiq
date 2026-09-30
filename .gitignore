@@ -14,8 +14,11 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
-# Spike / scratch work (throwaway by design, see PLAN.md Phase 0)
-spike/
+# Spike: harness code is tracked (schemas/prompts graduate into app/), but fetched
+# page content and model output are local scratch.
+spike/pages/
+spike/out/
+spike/urls.txt
 
 # Database dumps and backups
 *.dump
