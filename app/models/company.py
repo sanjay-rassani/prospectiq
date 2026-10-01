@@ -19,15 +19,19 @@ if TYPE_CHECKING:
 
 
 class CompanyStatus(enum.StrEnum):
-    """Lifecycle stage for a company. Expanded in later phases; Phase 2 only seeds."""
+    """Company lifecycle (spec §10.3). Transitions are deterministic Python only (§15.2)."""
 
-    SEEDED = "seeded"
+    SEEDED = "seeded"  # DISCOVERED
     RESEARCHED = "researched"
     QUALIFIED = "qualified"
     WATCH = "watch"
     NURTURE = "nurture"
     DISQUALIFIED = "disqualified"
     CLOSED = "closed"
+    CONTACTED = "contacted"
+    REPLIED = "replied"
+    CONVERSATION = "conversation"
+    PROJECT_LEAD = "project_lead"
 
 
 class SourceType(enum.StrEnum):

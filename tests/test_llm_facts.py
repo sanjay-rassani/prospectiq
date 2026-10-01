@@ -17,7 +17,9 @@ from app.services.llm.schemas import (
     CompanyFacts,
     Confidence,
     CustomerType,
+    InteractionSummary,
     OpportunityList,
+    OutreachDraft,
     SignalList,
     SizeHint,
 )
@@ -136,6 +138,46 @@ class FakeGateway:
             model="fake",
             prompt_version="v1",
             task="recommend_buyer_role",
+            seconds=0.01,
+            attempts=1,
+        )
+
+    def draft_outreach(self, *, brief_markdown: str, channel: str) -> CallResult:
+        self.calls += 1
+        parsed = OutreachDraft(
+            body=(
+                "Noticed your team mentioned coordinating sites with spreadsheets. "
+                "Would it be useful to explore whether a lightweight workflow could "
+                "reduce that evening reconciliation — happy to compare notes if relevant."
+            ),
+            subject=None,
+        )
+        return CallResult(
+            ok=True,
+            parsed=parsed,
+            raw_output=parsed.model_dump_json(),
+            model="fake",
+            prompt_version="v1",
+            task="draft_outreach",
+            seconds=0.01,
+            attempts=1,
+        )
+
+    def summarize_interaction(self, *, text: str) -> CallResult:
+        self.calls += 1
+        parsed = InteractionSummary(
+            outcome="replied_interested",
+            summary="Prospect replied with interest in a short call.",
+            suggested_next_action="Propose two times for a 20-minute call",
+            suggested_next_action_at=None,
+        )
+        return CallResult(
+            ok=True,
+            parsed=parsed,
+            raw_output=parsed.model_dump_json(),
+            model="fake",
+            prompt_version="v1",
+            task="summarize_interaction",
             seconds=0.01,
             attempts=1,
         )

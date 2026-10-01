@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% set active = 'outreach' %}
+
+{% block content %}
+<header>
+  <h1>Outreach queue</h1>
+  <p>Drafts await your review. Sending stays human — LinkedIn and email are never automated.</p>
+</header>
+
+{% if flash %}
+<p><mark>{{ flash }}</mark></p>
+{% endif %}
+
+<article>
+  <header><strong>Awaiting action</strong></header>
+  {% if awaiting %}
+  <table>
+    <thead>
+      <tr>
+        <th>Company</th>
+        <th>Opportunity</th>
+        <th>Channel</th>
+        <th>Status</th>
+        <th>Due</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in awaiting %}
+      <tr>
+        <td>{{ task.opportunity.company.name }}</td>
+        <td><a href="/outreach/{{ task.id }}">{{ task.opportunity.title }}</a></td>
+        <td>{{ task.channel }}</td>
+        <td>{{ task.status }}</td>
+        <td>{{ task.due_at or "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No drafts waiting.</p>
+  {% endif %}
+</article>
+
+<article>
+  <header><strong>Due follow-ups</strong></header>
+  {% if due_followups %}
+  <table>
+    <thead>
+      <tr>
+        <th>When</th>
+        <th>Company</th>
+        <th>Opportunity</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in due_followups %}
+      <tr>
+        <td>{{ item.next_action_at }}</td>
+        <td>{{ item.opportunity.company.name }}</td>
+        <td><a href="/opportunities/{{ item.opportunity_id }}">{{ item.opportunity.title }}</a></td>
+        <td>{{ item.next_action_note or item.summary }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No follow-ups due.</p>
+  {% endif %}
+</article>
+
+<article>
+  <header><strong>Outreach-ready without a task</strong></header>
+  {% if ready_without_task %}
+  <table>
+    <thead>
+      <tr>
+        <th>Company</th>
+        <th>Opportunity</th>
+        <th>Score</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for opp in ready_without_task %}
+      <tr>
+        <td>{{ opp.company.name }}</td>
+        <td><a href="/opportunities/{{ opp.id }}">{{ opp.title }}</a></td>
+        <td>{% if opp.opportunity_score is not none %}{{ '%.0f'|format(opp.opportunity_score) }}{% else %}—{% endif %}</td>
+        <td>
+          <form method="post" action="/opportunities/{{ opp.id }}/outreach">
+            <input type="hidden" name="channel" value="linkedin">
+            <button type="submit">Prepare outreach</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>None right now.</p>
+  {% endif %}
+</article>
+{% endblock %}

@@ -57,3 +57,8 @@ thresholds:
   band_medium: 55
   band_watch: 35
   outreach_ready_min: 65
+outreach:
+  unresponsive_after_touches: 3
+  evidence_stale_days: 45
+  default_follow_up_days: 7
+  default_channel: linkedin

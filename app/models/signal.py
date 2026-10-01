@@ -15,6 +15,7 @@ from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.company import Company, SourceSnapshot
+    from app.models.outreach import Interaction, OutreachTask
     from app.models.person import ResearchTask
 
 
@@ -37,6 +38,12 @@ class SignalStrength(enum.StrEnum):
 class OpportunityStatus(enum.StrEnum):
     ACTIVE = "active"
     OUTREACH_READY = "outreach_ready"
+    CONTACTED = "contacted"
+    REPLIED = "replied"
+    CONVERSATION = "conversation"
+    PROJECT_LEAD = "project_lead"
+    WATCH = "watch"
+    NURTURE = "nurture"
     SUPERSEDED = "superseded"
     REJECTED = "rejected"
     CLOSED = "closed"
@@ -131,6 +138,16 @@ class Opportunity(Base, TimestampMixin):
     research_tasks: Mapped[list[ResearchTask]] = relationship(
         back_populates="opportunity",
         cascade="all, delete-orphan",
+    )
+    outreach_tasks: Mapped[list[OutreachTask]] = relationship(
+        back_populates="opportunity",
+        cascade="all, delete-orphan",
+        order_by="desc(OutreachTask.created_at)",
+    )
+    interactions: Mapped[list[Interaction]] = relationship(
+        back_populates="opportunity",
+        cascade="all, delete-orphan",
+        order_by="desc(Interaction.occurred_at)",
     )
 
 

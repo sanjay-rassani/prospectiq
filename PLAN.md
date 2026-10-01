@@ -254,19 +254,23 @@ are rejected in code and documented in the README. 57 tests passing.
 
 Goal: a reviewable draft and a memory of what happened. Sending stays human.
 
-- [ ] **P7-1** `OutreachTask` model with status lifecycle.
-- [ ] **P7-2** Outreach brief assembly per §10.1 (deterministic, not generated).
-- [ ] **P7-3** `draft_outreach` constrained by §10.2: lead with context, never assert hypotheses
+- [x] **P7-1** `OutreachTask` model with status lifecycle.
+- [x] **P7-2** Outreach brief assembly per §10.1 (deterministic, not generated).
+- [x] **P7-3** `draft_outreach` constrained by §10.2: lead with context, never assert hypotheses
       as fact, never invent clients/metrics/familiarity.
-- [ ] **P7-4** Editable draft + explicit approve/reject; approval is operator-only.
-- [ ] **P7-5** `Interaction` model; record sent/reply/outcome with next action (FR-09).
-- [ ] **P7-6** `summarize_interaction` → outcome + suggested next step, operator-editable.
-- [ ] **P7-7** Lifecycle state machine from §10.3 incl. WATCH / NURTURE / DISQUALIFIED / CLOSED.
+- [x] **P7-4** Editable draft + explicit approve/reject; approval is operator-only.
+- [x] **P7-5** `Interaction` model; record sent/reply/outcome with next action (FR-09).
+- [x] **P7-6** `summarize_interaction` → outcome + suggested next step, operator-editable.
+- [x] **P7-7** Lifecycle state machine from §10.3 incl. WATCH / NURTURE / DISQUALIFIED / CLOSED.
       State transitions are deterministic Python only — never model output (§15.2).
-- [ ] **P7-8** Outreach queue screen and per-opportunity interaction timeline.
-- [ ] **P7-9** Stop/nurture rules: declined, irrelevant, unresponsive after N, evidence stale.
+- [x] **P7-8** Outreach queue screen and per-opportunity interaction timeline.
+- [x] **P7-9** Stop/nurture rules: declined, irrelevant, unresponsive after N, evidence stale.
 
-**Milestone:** brief → draft → approve → record reply → a due next action appears.
+**Milestone reached.** Prepare outreach builds a deterministic §10.1 brief, optional §10.2
+draft, operator approve/reject, mark-sent (human), then record reply with a due next action.
+Lifecycle transitions are Python-only; declined/irrelevant/unresponsive/stale rules move
+companies to nurture/watch/disqualified. Outreach queue lists drafts and due follow-ups.
+65 tests passing.
 **Acceptance:** FR-08, FR-09, AC-7, AC-8.
 
 ---

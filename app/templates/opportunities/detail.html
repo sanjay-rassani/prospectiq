@@ -142,6 +142,117 @@
 </article>
 
 <article>
+  <header><strong>Outreach</strong></header>
+  {% if opportunity.status in ['outreach_ready', 'active'] %}
+  <form method="post" action="/opportunities/{{ opportunity.id }}/outreach">
+    <label>
+      Channel
+      <select name="channel">
+        <option value="linkedin">LinkedIn</option>
+        <option value="email">Email</option>
+      </select>
+    </label>
+    <button type="submit">Prepare outreach brief</button>
+  </form>
+  {% endif %}
+  {% if outreach_tasks %}
+  <ul>
+    {% for task in outreach_tasks %}
+    <li>
+      <a href="/outreach/{{ task.id }}">{{ task.channel }} · {{ task.status }}</a>
+      {% if task.due_at %} · due {{ task.due_at }}{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</article>
+
+<article>
+  <header><strong>Interactions</strong></header>
+  {% if opportunity.interactions %}
+  <table>
+    <thead>
+      <tr>
+        <th>When</th>
+        <th>Dir</th>
+        <th>Channel</th>
+        <th>Outcome</th>
+        <th>Summary</th>
+        <th>Next</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in opportunity.interactions %}
+      <tr>
+        <td>{{ item.occurred_at }}</td>
+        <td>{{ item.direction }}</td>
+        <td>{{ item.channel }}</td>
+        <td>{{ item.outcome }}</td>
+        <td>{{ item.summary }}</td>
+        <td>
+          {% if item.next_action_at %}
+          <strong>{{ item.next_action_at }}</strong>
+          {% if item.next_action_note %} — {{ item.next_action_note }}{% endif %}
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No interactions yet.</p>
+  {% endif %}
+
+  <form method="post" action="/opportunities/{{ opportunity.id }}/interactions">
+    <fieldset>
+      <legend>Record interaction</legend>
+      <label>Channel
+        <select name="channel">
+          <option value="linkedin">LinkedIn</option>
+          <option value="email">Email</option>
+        </select>
+      </label>
+      <label>Direction
+        <select name="direction">
+          <option value="inbound">Inbound (reply)</option>
+          <option value="outbound">Outbound</option>
+        </select>
+      </label>
+      <label>Outcome
+        <select name="outcome">
+          {% for o in interaction_outcomes %}
+          <option value="{{ o }}">{{ o }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Summary <input type="text" name="summary" placeholder="Short note"></label>
+      <label>Raw text <textarea name="raw_text" rows="3" placeholder="Paste reply text (optional)"></textarea></label>
+      <label>Next action note <input type="text" name="next_action_note" placeholder="e.g. Follow up Tuesday"></label>
+      <label>Next action at <input type="datetime-local" name="next_action_at"></label>
+      <button type="submit">Save interaction</button>
+    </fieldset>
+  </form>
+</article>
+
+<article>
+  <header><strong>Lifecycle</strong></header>
+  <form method="post" action="/opportunities/{{ opportunity.id }}/lifecycle" style="display:inline">
+    <select name="status">
+      <option value="watch">watch</option>
+      <option value="nurture">nurture</option>
+      <option value="rejected">rejected</option>
+      <option value="closed">closed</option>
+      <option value="conversation">conversation</option>
+      <option value="project_lead">project_lead</option>
+    </select>
+    <button type="submit" class="secondary">Move status</button>
+  </form>
+  <form method="post" action="/opportunities/{{ opportunity.id }}/check-stale" style="display:inline">
+    <button type="submit" class="outline">Check stale evidence</button>
+  </form>
+</article>
+
+<article>
   <header><strong>Unknowns / risks</strong></header>
   {% if opportunity.unknowns %}
   <ul>

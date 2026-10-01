@@ -164,6 +164,35 @@ class BuyerRoleRecommendation(BaseModel):
     rationale: str = Field(description="One or two sentences explaining the choice.")
 
 
+class OutreachDraft(BaseModel):
+    """Spec §15.1 draft_outreach. Concise message; never asserts hypotheses as fact."""
+
+    body: str = Field(description="The outreach message body to send.")
+    subject: str | None = Field(
+        description="Email subject if channel is email, else null.",
+        default=None,
+    )
+
+
+class InteractionSummary(BaseModel):
+    """Spec §15.1 summarize_interaction. Operator may edit before acting."""
+
+    outcome: str = Field(
+        description=(
+            "One of: replied_interested, replied_not_now, declined, irrelevant, "
+            "no_response, conversation, other"
+        )
+    )
+    summary: str = Field(description="One or two sentences describing what happened.")
+    suggested_next_action: str = Field(
+        description="Concrete next step for the operator."
+    )
+    suggested_next_action_at: str | None = Field(
+        description="ISO-8601 date/time for the next action, or null.",
+        default=None,
+    )
+
+
 def strict_schema(model: type[BaseModel]) -> dict[str, Any]:
     """JSON Schema tightened for Ollama grammar-constrained decoding."""
     schema = model.model_json_schema()

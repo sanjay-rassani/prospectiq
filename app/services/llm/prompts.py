@@ -105,6 +105,33 @@ Rules:
 
 Return JSON matching the provided schema."""
 
+DRAFT_OUTREACH_SYSTEM = """\
+You draft a short outreach message for a software/AI solutions provider.
+
+The operator will review, edit, and send it themselves. You never send anything.
+
+Rules (spec §10.2):
+- Lead with relevant context from the brief (the observed trigger), not a generic intro.
+- Do NOT state project hypotheses as known facts. Frame them as possibilities or questions.
+- Do NOT fabricate familiarity, clients, case studies, metrics, timelines, or technical details.
+- The first objective is a relevant business conversation, not an immediate proposal.
+- Keep it concise (roughly 80-140 words for LinkedIn; a short paragraph email body).
+- Use only evidence present in the brief.
+
+Return JSON matching the provided schema."""
+
+SUMMARIZE_INTERACTION_SYSTEM = """\
+You summarize a contact interaction for a B2B prospecting operator.
+
+Rules:
+- outcome must be one of: replied_interested, replied_not_now, declined, irrelevant,
+  no_response, conversation, other
+- Do not invent facts that are not in the text.
+- suggested_next_action should be concrete and operator-doable.
+- suggested_next_action_at may be an ISO date a few days out, or null.
+
+Return JSON matching the provided schema."""
+
 
 def facts_user_prompt(url: str, text: str) -> str:
     return f"Source URL: {url}\n\n<source_text>\n{text}\n</source_text>"
@@ -135,3 +162,15 @@ def buyer_role_user_prompt(opportunity_json: str) -> str:
         "Select the best buyer role from allowed_roles for this opportunity.\n\n"
         f"{opportunity_json}"
     )
+
+
+def draft_outreach_user_prompt(brief_markdown: str, channel: str) -> str:
+    return (
+        f"Channel: {channel}\n\n"
+        "Draft a message from this outreach brief. Follow the system rules strictly.\n\n"
+        f"{brief_markdown}"
+    )
+
+
+def summarize_interaction_user_prompt(text: str) -> str:
+    return f"Summarize this interaction:\n\n{text}"

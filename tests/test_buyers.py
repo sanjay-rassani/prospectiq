@@ -148,6 +148,12 @@ def test_llm_out_of_vocab_falls_back(session: Session) -> None:
         ) -> CallResult:
             raise NotImplementedError
 
+        def draft_outreach(self, *, brief_markdown: str, channel: str) -> CallResult:
+            raise NotImplementedError
+
+        def summarize_interaction(self, *, text: str) -> CallResult:
+            raise NotImplementedError
+
     from app.services.buyers.recommend import recommend_buyer_role
 
     rec = recommend_buyer_role(opp, company, gateway=BadGateway(), session=session)

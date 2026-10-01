@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% set active = 'outreach' %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ul>
+    <li><a href="/outreach">Outreach</a></li>
+    <li><a href="/opportunities/{{ task.opportunity_id }}">{{ task.opportunity.title }}</a></li>
+    <li>Draft</li>
+  </ul>
+</nav>
+
+<header>
+  <h1>{{ task.opportunity.company.name }}</h1>
+  <p>
+    {{ task.opportunity.title }}
+    · {{ task.channel }}
+    · {{ task.status }}
+    {% if task.person %} · {{ task.person.name }}{% endif %}
+  </p>
+</header>
+
+{% if flash %}
+<p><mark>{{ flash }}</mark></p>
+{% endif %}
+
+<article>
+  <header><strong>Brief</strong> <small>(deterministic — not generated)</small></header>
+  <pre class="evidence">{{ brief_md }}</pre>
+</article>
+
+<article>
+  <header><strong>Draft</strong> <small>(review and edit before approving)</small></header>
+  <form method="post" action="/outreach/{{ task.id }}/save-draft">
+    <label>
+      Message
+      <textarea name="draft" rows="10" required>{{ task.draft or "" }}</textarea>
+    </label>
+    <button type="submit">Save draft</button>
+  </form>
+  {% if task.status in ['pending_draft', 'draft_ready', 'rejected'] %}
+  <form method="post" action="/outreach/{{ task.id }}/generate-draft">
+    <button type="submit" class="outline">Generate with local model</button>
+  </form>
+  {% endif %}
+  {% if task.rejection_reason %}
+  <p><mark>Rejected: {{ task.rejection_reason }}</mark></p>
+  {% endif %}
+</article>
+
+<article>
+  <header><strong>Approval</strong></header>
+  <p>Approval is operator-only. The system never sends LinkedIn or email.</p>
+  {% if task.status == 'draft_ready' or task.status == 'rejected' %}
+  <form method="post" action="/outreach/{{ task.id }}/approve" style="display:inline">
+    <button type="submit">Approve</button>
+  </form>
+  {% endif %}
+  {% if task.status in ['draft_ready', 'approved', 'pending_draft'] %}
+  <form method="post" action="/outreach/{{ task.id }}/reject" style="display:inline">
+    <input type="text" name="reason" required placeholder="Rejection reason">
+    <button type="submit" class="secondary">Reject</button>
+  </form>
+  {% endif %}
+  {% if task.status == 'approved' %}
+  <form method="post" action="/outreach/{{ task.id }}/mark-sent">
+    <button type="submit">I sent it — mark sent</button>
+  </form>
+  {% endif %}
+  {% if task.approved_at %}
+  <p><small>Approved at {{ task.approved_at }}</small></p>
+  {% endif %}
+</article>
+
+<article>
+  <header><strong>Interaction timeline</strong></header>
+  {% if task.opportunity.interactions %}
+  <table>
+    <thead>
+      <tr>
+        <th>When</th>
+        <th>Dir</th>
+        <th>Outcome</th>
+        <th>Summary</th>
+        <th>Next action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in task.opportunity.interactions %}
+      <tr>
+        <td>{{ item.occurred_at }}</td>
+        <td>{{ item.direction }}</td>
+        <td>{{ item.outcome }}</td>
+        <td>{{ item.summary }}</td>
+        <td>
+          {% if item.next_action_at %}
+          {{ item.next_action_at }}
+          {% if item.next_action_note %} — {{ item.next_action_note }}{% endif %}
+          {% else %}
+          —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No interactions yet.</p>
+  {% endif %}
+</article>
+{% endblock %}

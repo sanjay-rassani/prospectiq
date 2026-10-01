@@ -54,6 +54,10 @@ class LlmGateway(Protocol):
 
     def recommend_buyer_role(self, *, opportunity_json: str) -> CallResult: ...
 
+    def draft_outreach(self, *, brief_markdown: str, channel: str) -> CallResult: ...
+
+    def summarize_interaction(self, *, text: str) -> CallResult: ...
+
 
 class OllamaGateway:
     """Production gateway talking to a local Ollama instance."""
@@ -154,6 +158,32 @@ class OllamaGateway:
             output_model=BuyerRoleRecommendation,
             prompt_version=prompts.PROMPT_VERSION,
             task="recommend_buyer_role",
+        )
+
+    def draft_outreach(self, *, brief_markdown: str, channel: str) -> CallResult:
+        from app.services.llm import prompts
+        from app.services.llm.schemas import OutreachDraft
+
+        return self.call_schema(
+            model=self.settings.generation_model,
+            system=prompts.DRAFT_OUTREACH_SYSTEM,
+            user=prompts.draft_outreach_user_prompt(brief_markdown, channel),
+            output_model=OutreachDraft,
+            prompt_version=prompts.PROMPT_VERSION,
+            task="draft_outreach",
+        )
+
+    def summarize_interaction(self, *, text: str) -> CallResult:
+        from app.services.llm import prompts
+        from app.services.llm.schemas import InteractionSummary
+
+        return self.call_schema(
+            model=self.settings.generation_model,
+            system=prompts.SUMMARIZE_INTERACTION_SYSTEM,
+            user=prompts.summarize_interaction_user_prompt(text),
+            output_model=InteractionSummary,
+            prompt_version=prompts.PROMPT_VERSION,
+            task="summarize_interaction",
         )
 
     def call_schema(

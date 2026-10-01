@@ -24,6 +24,13 @@ class ScoreThresholds(BaseModel):
     outreach_ready_min: float = 65
 
 
+class OutreachSettings(BaseModel):
+    unresponsive_after_touches: int = 3
+    evidence_stale_days: int = 45
+    default_follow_up_days: int = 7
+    default_channel: str = "linkedin"
+
+
 class OperatorProfile(BaseModel):
     positioning: str = "Software and AI solutions provider"
     capabilities: list[str] = Field(default_factory=list)
@@ -35,6 +42,7 @@ class OperatorProfile(BaseModel):
     do_not_contact_domains: list[str] = Field(default_factory=list)
     allow_agency_white_label: bool = True
     thresholds: ScoreThresholds = Field(default_factory=ScoreThresholds)
+    outreach: OutreachSettings = Field(default_factory=OutreachSettings)
 
 
 def _load_raw(path: Path) -> dict[str, Any]:

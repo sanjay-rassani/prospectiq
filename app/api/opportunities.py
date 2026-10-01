@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.db.session import get_session
 from app.models import (
     Company,
+    InteractionOutcome,
     Opportunity,
     OpportunityEvidence,
     ResearchTask,
@@ -44,6 +45,8 @@ def opportunity_detail(
             selectinload(Opportunity.company).selectinload(Company.people),
             selectinload(Opportunity.evidence_links).selectinload(OpportunityEvidence.signal),
             selectinload(Opportunity.research_tasks),
+            selectinload(Opportunity.outreach_tasks),
+            selectinload(Opportunity.interactions),
         )
     )
     if opportunity is None:
@@ -68,6 +71,8 @@ def opportunity_detail(
             "opportunity": opportunity,
             "matching_people": matching_people,
             "open_research_tasks": open_tasks,
+            "outreach_tasks": opportunity.outreach_tasks,
+            "interaction_outcomes": [o.value for o in InteractionOutcome],
             "flash": request.query_params.get("flash"),
         },
     )

@@ -16,6 +16,7 @@ from app.models import (
     OpportunityStatus,
     Signal,
 )
+from app.services.outreach.lifecycle import ensure_company_qualified_for_outreach
 from app.services.scoring.exclusions import exclusion_reason
 from app.services.scoring.icp import score_icp
 from app.services.scoring.opportunity_score import score_opportunity
@@ -91,17 +92,32 @@ def apply_opportunity_scores(
         )
 
     for opp in opportunities:
+        # Do not re-score / demote opportunities already in the outreach conversation path.
+        if opp.status in {
+            OpportunityStatus.CONTACTED.value,
+            OpportunityStatus.REPLIED.value,
+            OpportunityStatus.CONVERSATION.value,
+            OpportunityStatus.PROJECT_LEAD.value,
+            OpportunityStatus.NURTURE.value,
+            OpportunityStatus.WATCH.value,
+            OpportunityStatus.CLOSED.value,
+            OpportunityStatus.REJECTED.value,
+            OpportunityStatus.SUPERSEDED.value,
+        }:
+            continue
         result = score_opportunity(opp, profile, now=now)
         opp.opportunity_score = round(result.total, 2)
         opp.score_reasons_json = result.reasons_dict()
         opp.priority = result.band.value if result.band else None
-        apply_promotion_status(
+        promoted = apply_promotion_status(
             opp,
             company_excluded=company_excluded,
             company_exclusion_reason=excl,
             profile=profile,
             now=now,
         )
+        if promoted:
+            ensure_company_qualified_for_outreach(company)
     session.flush()
 
 
