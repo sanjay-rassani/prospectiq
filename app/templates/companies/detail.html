@@ -327,4 +327,19 @@
   <p>No snapshots yet. Use <em>Refresh now</em> or re-seed this domain.</p>
   {% endif %}
 </article>
+
+<article>
+  <header><strong>Operator feedback</strong></header>
+  <p>Good/bad signals tune thresholds only — they never train a model.</p>
+  <form method="post" action="/companies/{{ company.id }}/feedback">
+    <label>Verdict
+      <select name="verdict">
+        <option value="good">good prospect</option>
+        <option value="bad">bad prospect</option>
+      </select>
+    </label>
+    <label>Reason <input type="text" name="reason" required placeholder="Why?"></label>
+    <button type="submit">Save feedback</button>
+  </form>
+</article>
 {% endblock %}

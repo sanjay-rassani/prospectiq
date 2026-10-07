@@ -24,6 +24,7 @@ from app.api.companies import router as companies_router
 from app.api.jobs import router as jobs_router
 from app.api.opportunities import router as opportunities_router
 from app.api.outreach import router as outreach_router
+from app.api.settings import router as settings_router
 from app.config import get_settings
 from app.db.session import get_session
 from app.jobs.scheduler import start_scheduler, stop_scheduler
@@ -65,6 +66,7 @@ app.include_router(companies_router)
 app.include_router(opportunities_router)
 app.include_router(outreach_router)
 app.include_router(jobs_router)
+app.include_router(settings_router)
 
 
 @app.get("/health")

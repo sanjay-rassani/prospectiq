@@ -35,6 +35,8 @@ def handle_job(session: Session, job: Job) -> str:
         return _handle_enqueue_due_refreshes(session, job)
     if job.job_type == JobType.CHECK_STALE_EVIDENCE.value:
         return _handle_check_stale(session, job)
+    if job.job_type == JobType.POLL_FEEDS.value:
+        return _handle_poll_feeds(session, job)
     raise ValueError(f"Unknown job type: {job.job_type}")
 
 
@@ -155,12 +157,40 @@ def _handle_check_stale(session: Session, job: Job) -> str:
     return f"stale check moved {moved}"
 
 
+def _handle_poll_feeds(session: Session, job: Job) -> str:
+    from app.models import SourceFeed
+    from app.services.discovery.rss import poll_feed
+
+    feeds = session.scalars(
+        select(SourceFeed).where(SourceFeed.enabled.is_(True))
+    ).all()
+    new_total = 0
+    seeded_total = 0
+    errors = 0
+    for feed in feeds:
+        try:
+            stats = poll_feed(session, feed)
+            new_total += int(stats.get("new_entries", 0))
+            seeded_total += int(stats.get("seeded", 0))
+        except Exception:
+            errors += 1
+            logger.exception("poll feed %s failed", feed.url)
+    enqueue_job(
+        session,
+        JobType.POLL_FEEDS.value,
+        due_at=datetime.now(UTC) + timedelta(hours=6),
+        dedupe_pending=True,
+    )
+    return f"feeds={len(feeds)} new={new_total} seeded={seeded_total} errors={errors}"
+
+
 def ensure_maintenance_jobs(session: Session) -> None:
     """Seed recurring maintenance jobs if none are pending/running."""
     now = datetime.now(UTC)
     for job_type, due in (
         (JobType.ENQUEUE_DUE_REFRESHES.value, now),
         (JobType.CHECK_STALE_EVIDENCE.value, now + timedelta(hours=1)),
+        (JobType.POLL_FEEDS.value, now + timedelta(minutes=30)),
     ):
         existing = session.scalar(
             select(Job).where(

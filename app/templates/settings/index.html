@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% set active = 'settings' %}
+
+{% block content %}
+<header>
+  <h1>Settings</h1>
+  <p>Operator profile, adapters, feeds, and fetch policies. Profile file: <code>{{ profile_path }}</code></p>
+</header>
+
+{% if flash %}
+<p><mark>{{ flash }}</mark></p>
+{% endif %}
+
+<article>
+  <header><strong>Target profile &amp; thresholds</strong></header>
+  <form method="post" action="/settings/profile">
+    <label>Positioning
+      <input type="text" name="positioning" value="{{ profile.positioning }}">
+    </label>
+    <label>Target industries (comma-separated)
+      <input type="text" name="target_industries" value="{{ profile.target_industries | join(', ') }}">
+    </label>
+    <label>Target regions
+      <input type="text" name="target_regions" value="{{ profile.target_regions | join(', ') }}">
+    </label>
+    <label>Excluded industries
+      <input type="text" name="excluded_industries" value="{{ profile.excluded_industries | join(', ') }}">
+    </label>
+    <label>Preferred solution families
+      <input type="text" name="preferred_solution_families" value="{{ profile.preferred_solution_families | join(', ') }}">
+    </label>
+    <div class="grid">
+      <label>Band high <input type="number" step="1" name="band_high" value="{{ profile.thresholds.band_high }}"></label>
+      <label>Band medium <input type="number" step="1" name="band_medium" value="{{ profile.thresholds.band_medium }}"></label>
+      <label>Band watch <input type="number" step="1" name="band_watch" value="{{ profile.thresholds.band_watch }}"></label>
+      <label>Outreach-ready min <input type="number" step="1" name="outreach_ready_min" value="{{ profile.thresholds.outreach_ready_min }}"></label>
+    </div>
+    <div class="grid">
+      <label>Refresh high (days) <input type="number" name="refresh_high" value="{{ profile.outreach.refresh_interval_days.get('high', 2) }}"></label>
+      <label>Medium <input type="number" name="refresh_medium" value="{{ profile.outreach.refresh_interval_days.get('medium', 7) }}"></label>
+      <label>Watch <input type="number" name="refresh_watch" value="{{ profile.outreach.refresh_interval_days.get('watch', 14) }}"></label>
+      <label>Nurture <input type="number" name="refresh_nurture" value="{{ profile.outreach.refresh_interval_days.get('nurture', 30) }}"></label>
+    </div>
+    <label>Extraction model (document only — set EXTRACTION_MODEL in .env)
+      <input type="text" name="extraction_model" value="{{ settings.extraction_model }}">
+    </label>
+    <label>Generation model (document only — set GENERATION_MODEL in .env)
+      <input type="text" name="generation_model" value="{{ settings.generation_model }}">
+    </label>
+    <button type="submit">Save profile</button>
+  </form>
+</article>
+
+<article>
+  <header><strong>Adapters</strong></header>
+  <table>
+    <thead><tr><th>Kind</th><th>Label</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      {% for adapter in adapters %}
+      <tr>
+        <td><code>{{ adapter.kind }}</code></td>
+        <td>{{ adapter.label }}</td>
+        <td>{{ "on" if adapter.enabled_by_default else "off" }}</td>
+        <td>{{ adapter.description }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</article>
+
+<article>
+  <header><strong>Feeds</strong></header>
+  {% if feeds %}
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Kind</th><th>URL</th><th>Enabled</th><th>Last fetch</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for feed in feeds %}
+      <tr>
+        <td>{{ feed.name }}</td>
+        <td>{{ feed.kind }}</td>
+        <td><code>{{ feed.url }}</code></td>
+        <td>{{ "yes" if feed.enabled else "no" }}</td>
+        <td>{{ feed.last_fetched_at or "—" }}</td>
+        <td>
+          <form method="post" action="/settings/feeds/{{ feed.id }}/poll" style="display:inline"><button type="submit" class="outline">Poll</button></form>
+          <form method="post" action="/settings/feeds/{{ feed.id }}/toggle" style="display:inline"><button type="submit" class="secondary">Toggle</button></form>
+          <form method="post" action="/settings/feeds/{{ feed.id }}/delete" style="display:inline"><button type="submit" class="contrast">Remove</button></form>
+        </td>
+      </tr>
+      {% if feed.last_error %}
+      <tr><td colspan="6"><small>{{ feed.last_error }}</small></td></tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No feeds yet.</p>
+  {% endif %}
+  <form method="post" action="/settings/feeds">
+    <fieldset>
+      <legend>Add feed</legend>
+      <label>Name <input type="text" name="name" required></label>
+      <label>URL <input type="url" name="url" required placeholder="https://example.com/feed.xml"></label>
+      <label>Kind
+        <select name="kind">
+          <option value="rss">rss</option>
+          <option value="github_releases">github_releases</option>
+          <option value="changelog">changelog</option>
+        </select>
+      </label>
+      <button type="submit">Add</button>
+    </fieldset>
+  </form>
+</article>
+
+<article>
+  <header><strong>Domain fetch policy (Playwright opt-in)</strong></header>
+  <p>Playwright is optional and off by default. Enable only where plain HTTP is genuinely insufficient.</p>
+  {% if policies %}
+  <ul>
+    {% for policy in policies %}
+    <li>
+      <code>{{ policy.domain }}</code>
+      · playwright={{ policy.playwright_fallback }}
+      {% if policy.notes %} — {{ policy.notes }}{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <form method="post" action="/settings/domain-policy">
+    <label>Domain <input type="text" name="domain" required placeholder="app.example.com"></label>
+    <label><input type="checkbox" name="playwright_fallback" value="on"> Enable Playwright fallback</label>
+    <label>Notes <input type="text" name="notes"></label>
+    <button type="submit">Save policy</button>
+  </form>
+</article>
+
+<article>
+  <header><strong>Recent operator feedback</strong></header>
+  {% if feedback %}
+  <ul>
+    {% for row in feedback %}
+    <li>
+      {{ row.verdict }} · company <code>{{ row.company_id }}</code>
+      — {{ row.reason }}
+      {% if row.suggested_adjustment %}<br><small>{{ row.suggested_adjustment }}</small>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>No feedback yet. Use the form on a company detail page.</p>
+  {% endif %}
+</article>
+{% endblock %}

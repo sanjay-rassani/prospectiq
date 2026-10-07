@@ -19,6 +19,7 @@ class JobType(enum.StrEnum):
     FOLLOW_UP_REMINDER = "follow_up_reminder"
     ENQUEUE_DUE_REFRESHES = "enqueue_due_refreshes"
     CHECK_STALE_EVIDENCE = "check_stale_evidence"
+    POLL_FEEDS = "poll_feeds"
 
 
 class JobStatus(enum.StrEnum):

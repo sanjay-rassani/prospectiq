@@ -304,16 +304,19 @@ resurface only when a change yields signals; Today and failed-jobs screens are l
 
 Only now, once the pipeline is proven. Adding sources earlier just scales noise.
 
-- [ ] **P9-1** RSS/Atom adapter with feedparser; dedupe by entry id/link.
-- [ ] **P9-2** Feed management UI (add/remove/enable).
-- [ ] **P9-3** Adapter registry with per-source enable/disable and rate config (§5).
-- [ ] **P9-4** Settings screen: target profile, offer families, thresholds, refresh intervals,
+- [x] **P9-1** RSS/Atom adapter with feedparser; dedupe by entry id/link.
+- [x] **P9-2** Feed management UI (add/remove/enable).
+- [x] **P9-3** Adapter registry with per-source enable/disable and rate config (§5).
+- [x] **P9-4** Settings screen: target profile, offer families, thresholds, refresh intervals,
       adapters, model selection.
-- [ ] **P9-5** Operator feedback capture (good/bad prospect) stored with reasons. Feeds
+- [x] **P9-5** Operator feedback capture (good/bad prospect) stored with reasons. Feeds
       deterministic threshold tuning only — no training claims (§2.3).
-- [ ] **P9-6** Optional, permitted-only: public technical sources (GitHub, changelogs).
-- [ ] **P9-7** Playwright fallback, opt-in per domain, only where HTTP is genuinely insufficient.
+- [x] **P9-6** Optional, permitted-only: public technical sources (GitHub, changelogs).
+- [x] **P9-7** Playwright fallback, opt-in per domain, only where HTTP is genuinely insufficient.
 
+**Milestone reached.** Settings manages profile YAML, adapters, RSS/GitHub/changelog feeds
+(with dedupe), domain Playwright opt-in, and good/bad feedback that only suggests threshold
+edits. 80 tests passing.
 **Acceptance:** FR-01 (full), FR-12.
 
 ---

@@ -2,6 +2,13 @@
 
 from app.db.base import Base, TimestampMixin
 from app.models.company import Company, CompanyStatus, SourceSnapshot, SourceType
+from app.models.feeds import (
+    AdapterKind,
+    DomainFetchPolicy,
+    FeedEntry,
+    OperatorFeedback,
+    SourceFeed,
+)
 from app.models.job import Job, JobStatus, JobType
 from app.models.llm_call import LlmCall
 from app.models.outreach import (
@@ -29,9 +36,12 @@ from app.models.signal import (
 )
 
 __all__ = [
+    "AdapterKind",
     "Base",
     "Company",
     "CompanyStatus",
+    "DomainFetchPolicy",
+    "FeedEntry",
     "Interaction",
     "InteractionDirection",
     "InteractionOutcome",
@@ -39,6 +49,7 @@ __all__ = [
     "JobStatus",
     "JobType",
     "LlmCall",
+    "OperatorFeedback",
     "Opportunity",
     "OpportunityEvidence",
     "OpportunityStatus",
@@ -53,6 +64,7 @@ __all__ = [
     "SignalStrength",
     "SignalType",
     "SolutionFamily",
+    "SourceFeed",
     "SourceSnapshot",
     "SourceType",
     "TimestampMixin",
