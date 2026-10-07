@@ -62,3 +62,13 @@ outreach:
   evidence_stale_days: 45
   default_follow_up_days: 7
   default_channel: linkedin
+  refresh_interval_days:
+    high: 2
+    medium: 7
+    watch: 14
+    nurture: 30
+    reject: 30
+  max_job_attempts: 5
+  job_backoff_base_seconds: 60
+  scheduler_enabled: true
+  scheduler_tick_seconds: 60

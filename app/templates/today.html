@@ -2,22 +2,101 @@
 {% set active = 'today' %}
 
 {% block content %}
-<h1>Today</h1>
+<header>
+  <h1>Today</h1>
+  <p>What needs attention right now.</p>
+</header>
 
-{# The three questions this screen answers, per spec section 16. Wired up in Phase 8;
-   until then the empty states document what belongs here. #}
+{% if flash %}
+<p><mark>{{ flash }}</mark></p>
+{% endif %}
+
 <article>
   <header><strong>High-priority opportunities</strong></header>
-  <p>Nothing yet. Seed a company to begin.</p>
+  {% if high_priority %}
+  <table>
+    <thead>
+      <tr><th>Company</th><th>Opportunity</th><th>Score</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      {% for opp in high_priority %}
+      <tr>
+        <td><a href="/companies/{{ opp.company_id }}">{{ opp.company.name }}</a></td>
+        <td><a href="/opportunities/{{ opp.id }}">{{ opp.title }}</a></td>
+        <td>{% if opp.opportunity_score is not none %}{{ '%.0f'|format(opp.opportunity_score) }}{% else %}—{% endif %}</td>
+        <td>{{ opp.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>Nothing high-priority yet.</p>
+  {% endif %}
 </article>
 
 <article>
   <header><strong>Outreach and follow-ups due</strong></header>
-  <p>Nothing due.</p>
+  {% if due_outreach or due_followups %}
+  {% if due_outreach %}
+  <h3>Drafts awaiting action</h3>
+  <ul>
+    {% for task in due_outreach %}
+    <li>
+      <a href="/outreach/{{ task.id }}">{{ task.opportunity.company.name }} — {{ task.opportunity.title }}</a>
+      · {{ task.status }}
+      {% if task.due_at %} · due {{ task.due_at }}{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if due_followups %}
+  <h3>Follow-ups</h3>
+  <ul>
+    {% for item in due_followups %}
+    <li>
+      <a href="/opportunities/{{ item.opportunity_id }}">{{ item.opportunity.company.name }} — {{ item.opportunity.title }}</a>
+      · {{ item.next_action_at }}
+      {% if item.next_action_note %} — {{ item.next_action_note }}{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% else %}
+  <p>Nothing due. <a href="/outreach">Open outreach queue</a></p>
+  {% endif %}
 </article>
 
 <article>
   <header><strong>Newly changed prospects</strong></header>
-  <p>No changes detected.</p>
+  {% if newly_changed or resurfaced %}
+  {% if resurfaced %}
+  <h3>Resurfaced</h3>
+  <ul>
+    {% for company in resurfaced %}
+    <li>
+      <a href="/companies/{{ company.id }}">{{ company.name }}</a>
+      · resurfaced {{ company.resurfaced_at }}
+      · {{ company.priority or "—" }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if newly_changed %}
+  <h3>Content changes (48h)</h3>
+  <ul>
+    {% for snap in newly_changed %}
+    <li>
+      <a href="/companies/{{ snap.company_id }}#snap-{{ snap.id }}">{{ snap.company.name }}</a>
+      · {{ snap.fetched_at }}
+      · {{ snap.title or snap.url }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% else %}
+  <p>No changes detected recently.</p>
+  {% endif %}
 </article>
+
+<p><small><a href="/jobs/failed">Failed jobs</a></small></p>
 {% endblock %}

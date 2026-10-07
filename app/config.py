@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     llm_max_input_chars: int = 12000
     # Disable for environments without Ollama; seed/refresh still store snapshots.
     llm_enabled: bool = True
+    # APScheduler in-process tick (Phase 8). Tests disable this.
+    scheduler_enabled: bool = True
 
     # Politeness defaults for the fetcher (spec section 18).
     user_agent: str = "ProspectingEngine/0.1 (personal business research)"

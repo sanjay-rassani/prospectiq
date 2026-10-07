@@ -14,6 +14,7 @@ from app.models import (
     Interaction,
     InteractionDirection,
     InteractionOutcome,
+    JobType,
     Opportunity,
     OpportunityEvidence,
     OpportunityStatus,
@@ -217,5 +218,15 @@ def mark_sent(
     session.add(interaction)
     transition_opportunity(opportunity, OpportunityStatus.CONTACTED.value)
     _advance_company_to_contacted(company)
+    if interaction.next_action_at is not None:
+        from app.jobs.queue import enqueue_job
+
+        enqueue_job(
+            session,
+            JobType.FOLLOW_UP_REMINDER.value,
+            entity_id=interaction.id,
+            due_at=interaction.next_action_at,
+            dedupe_pending=True,
+        )
     session.flush()
     return interaction

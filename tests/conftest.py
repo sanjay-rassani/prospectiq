@@ -30,6 +30,7 @@ def _disable_llm_unless_injected(monkeypatch: pytest.MonkeyPatch) -> Generator[N
     llm_enabled gate when provided.
     """
     monkeypatch.setenv("LLM_ENABLED", "false")
+    monkeypatch.setenv("SCHEDULER_ENABLED", "false")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

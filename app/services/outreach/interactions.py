@@ -13,6 +13,7 @@ from app.models import (
     Interaction,
     InteractionDirection,
     InteractionOutcome,
+    JobType,
     Opportunity,
     OpportunityStatus,
 )
@@ -82,6 +83,17 @@ def record_interaction(
     apply_outcome_stop_rule(company, opportunity, interaction.outcome)
     if direction == InteractionDirection.OUTBOUND.value:
         apply_unresponsive_rule(session, company, opportunity, profile=profile)
+
+    if interaction.next_action_at is not None:
+        from app.jobs.queue import enqueue_job
+
+        enqueue_job(
+            session,
+            JobType.FOLLOW_UP_REMINDER.value,
+            entity_id=interaction.id,
+            due_at=interaction.next_action_at,
+            dedupe_pending=True,
+        )
 
     session.flush()
     return interaction

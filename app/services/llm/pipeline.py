@@ -17,6 +17,8 @@ from app.services.llm.opportunities import (
     load_company_signals_for_generation,
 )
 from app.services.llm.signals import extract_and_persist_signals
+from app.services.monitoring.cadence import apply_next_refresh
+from app.services.monitoring.resurface import maybe_resurface
 from app.services.scoring import score_company_and_opportunities
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,7 @@ class PipelineResult:
     opportunities: list[Opportunity] = field(default_factory=list)
     scored: bool = False
     buyers: bool = False
+    resurfaced: bool = False
 
     @property
     def summary(self) -> str:
@@ -46,6 +49,8 @@ class PipelineResult:
             parts.append("scored")
         if self.buyers:
             parts.append("buyers")
+        if self.resurfaced:
+            parts.append("resurfaced")
         return "; ".join(parts) if parts else "no LLM output"
 
 
@@ -55,7 +60,7 @@ def process_new_snapshot(
     snapshot: SourceSnapshot,
     gateway: LlmGateway | None = None,
 ) -> PipelineResult | None:
-    """Run the Phase 3-6 research chain for a newly stored snapshot only.
+    """Run the Phase 3-8 research chain for a newly stored snapshot only.
 
     Unchanged re-fetches must never call this (AC-3 / P3-6).
     """
@@ -86,8 +91,11 @@ def process_new_snapshot(
     result.scored = True
 
     # Phase 6: role recommendation, permitted-page person capture, research tasks.
-    # Deterministic path runs even without a gateway (role map + page capture).
     process_buyers_for_company(session, company, gateway=gateway)
     result.buyers = True
+
+    # Phase 8: resurface dormant companies on meaningful (signal-producing) change.
+    result.resurfaced = maybe_resurface(company, snapshot, signals)
+    apply_next_refresh(company)
 
     return result

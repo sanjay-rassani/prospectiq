@@ -29,6 +29,19 @@ class OutreachSettings(BaseModel):
     evidence_stale_days: int = 45
     default_follow_up_days: int = 7
     default_channel: str = "linkedin"
+    refresh_interval_days: dict[str, int] = Field(
+        default_factory=lambda: {
+            "high": 2,
+            "medium": 7,
+            "watch": 14,
+            "nurture": 30,
+            "reject": 30,
+        }
+    )
+    max_job_attempts: int = 5
+    job_backoff_base_seconds: int = 60
+    scheduler_enabled: bool = True
+    scheduler_tick_seconds: int = 60
 
 
 class OperatorProfile(BaseModel):

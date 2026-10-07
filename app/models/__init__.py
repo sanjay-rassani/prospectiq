@@ -2,6 +2,7 @@
 
 from app.db.base import Base, TimestampMixin
 from app.models.company import Company, CompanyStatus, SourceSnapshot, SourceType
+from app.models.job import Job, JobStatus, JobType
 from app.models.llm_call import LlmCall
 from app.models.outreach import (
     Interaction,
@@ -34,6 +35,9 @@ __all__ = [
     "Interaction",
     "InteractionDirection",
     "InteractionOutcome",
+    "Job",
+    "JobStatus",
+    "JobType",
     "LlmCall",
     "Opportunity",
     "OpportunityEvidence",

@@ -31,7 +31,10 @@ def apply_company_scores(
     company: Company,
     profile: OperatorProfile | None = None,
 ) -> None:
+    from app.services.monitoring.cadence import apply_next_refresh
+
     profile = profile or get_operator_profile()
+    previous_priority = company.priority
     result = score_icp(company, profile)
     company.icp_score = round(result.total, 2)
     company.icp_reasons_json = result.reasons_dict()
@@ -55,6 +58,8 @@ def apply_company_scores(
             company.priority = "watch"
         else:
             company.priority = "reject"
+    if company.priority != previous_priority or company.next_refresh_at is None:
+        apply_next_refresh(company, profile=profile)
     session.flush()
 
 

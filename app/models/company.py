@@ -80,6 +80,8 @@ class Company(Base, TimestampMixin):
     facts_extracted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     icp_reasons_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     exclusion_reason: Mapped[str | None] = mapped_column(Text)
+    # Set when a dormant company gets meaningful new evidence (P8-7).
+    resurfaced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     snapshots: Mapped[list[SourceSnapshot]] = relationship(
         back_populates="company",

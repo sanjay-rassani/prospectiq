@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% set active = 'today' %}
+
+{% block content %}
+<header>
+  <h1>Jobs</h1>
+  <p>
+    Scheduler
+    {% if scheduler.running %}running{% else %}stopped{% endif %}
+    · enabled={{ scheduler.enabled }}
+  </p>
+</header>
+
+<article>
+  <header><strong>Failed</strong></header>
+  {% if failed %}
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Entity</th>
+        <th>Attempts</th>
+        <th>Error</th>
+        <th>Correlation</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in failed %}
+      <tr>
+        <td>{{ job.job_type }}</td>
+        <td><code>{{ job.entity_id or "—" }}</code></td>
+        <td>{{ job.attempts }}</td>
+        <td>{{ job.last_error }}</td>
+        <td><code>{{ job.correlation_id or "—" }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No failed jobs.</p>
+  {% endif %}
+</article>
+
+<article>
+  <header><strong>Currently running</strong></header>
+  {% if running %}
+  <ul>
+    {% for job in running %}
+    <li>{{ job.job_type }} · locked {{ job.locked_at }} · attempt {{ job.attempts }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>None.</p>
+  {% endif %}
+</article>
+
+<p><a href="/">Back to Today</a></p>
+{% endblock %}

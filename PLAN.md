@@ -279,19 +279,23 @@ companies to nurture/watch/disqualified. Outreach queue lists drafts and due fol
 
 Goal: it keeps working while you don't look at it.
 
-- [ ] **P8-1** `Job` model per §13 (`due_at`, `attempts`, `last_error`, `locked_at`).
-- [ ] **P8-2** APScheduler 3.x in-process, with Postgres `Job` rows as the durable record.
-- [ ] **P8-3** Row-level locking so a restart mid-job doesn't duplicate or lose work.
-- [ ] **P8-4** Idempotent job handlers; capped exponential backoff on failure (§18).
-- [ ] **P8-5** Adaptive refresh cadence per §11 (High 1-3d, Medium 7d, Watch 14d, Nurture 30d).
-- [ ] **P8-6** `next_refresh_at` computed on priority change.
-- [ ] **P8-7** Resurfacing: meaningful change on a dormant company raises priority and surfaces
+- [x] **P8-1** `Job` model per §13 (`due_at`, `attempts`, `last_error`, `locked_at`).
+- [x] **P8-2** APScheduler 3.x in-process, with Postgres `Job` rows as the durable record.
+- [x] **P8-3** Row-level locking so a restart mid-job doesn't duplicate or lose work.
+- [x] **P8-4** Idempotent job handlers; capped exponential backoff on failure (§18).
+- [x] **P8-5** Adaptive refresh cadence per §11 (High 1-3d, Medium 7d, Watch 14d, Nurture 30d).
+- [x] **P8-6** `next_refresh_at` computed on priority change.
+- [x] **P8-7** Resurfacing: meaningful change on a dormant company raises priority and surfaces
       it on Today.
-- [ ] **P8-8** Follow-up reminder jobs from `Interaction.next_action_at`.
-- [ ] **P8-9** "Today" screen: high-priority opportunities, due outreach, newly changed prospects.
-- [ ] **P8-10** Failed-jobs view (§18 observability).
-- [ ] **P8-11** Restart-safety test: kill mid-run, confirm no state loss (AC-10).
+- [x] **P8-8** Follow-up reminder jobs from `Interaction.next_action_at`.
+- [x] **P8-9** "Today" screen: high-priority opportunities, due outreach, newly changed prospects.
+- [x] **P8-10** Failed-jobs view (§18 observability).
+- [x] **P8-11** Restart-safety test: kill mid-run, confirm no state loss (AC-10).
 
+**Milestone reached.** Postgres `Job` rows + APScheduler tick; `FOR UPDATE SKIP LOCKED`
+claiming; backoff on failure; cadence drives `next_refresh_at`; watch/nurture companies
+resurface only when a change yields signals; Today and failed-jobs screens are live.
+74 tests passing.
 **Acceptance:** FR-10, AC-9, AC-10.
 
 ---
