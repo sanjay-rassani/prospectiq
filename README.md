@@ -1,128 +1,110 @@
-# Prospecting Engine
+# ProspectIQ
 
-A self-hosted business-development engine for a software and AI solutions provider. It
-discovers companies from public sources, snapshots the evidence, detects change signals,
-and turns them into evidence-backed project hypotheses with a likely buyer role and a
-drafted message — which **you** review and send.
+Self-hosted B2B prospecting for one operator. You seed companies from public pages; the
+engine snapshots evidence, detects change, scores fit, and drafts outreach you review and
+send yourself.
 
-Requirements and design live in `prospecting-engine-final-v1.3.docx`. The ordered build
-plan, decision log, and open questions live in [`PLAN.md`](PLAN.md).
+**No paid APIs.** Postgres in Docker + local Ollama only.  
+**Evidence or it doesn't exist.** Every signal links to a stored page snapshot.  
+**Not a job board.** Hiring signals count *against* a prospect.
 
-## Two rules that shape everything
+Full build plan: [`PLAN.md`](PLAN.md). Spec: `prospecting-engine-final-v1.3.docx`.
 
-**No paid dependencies.** No paid LLM APIs, lead databases, search APIs, CRM, proxies, or
-cloud services. Postgres in Docker and a local Ollama model, and that's it.
+---
 
-**Evidence or it doesn't exist.** Every signal and hypothesis traces back to a stored
-source snapshot. The system never claims a company has a problem because the model thinks
-it's common in that industry.
+## Get started
 
-It is not a job-hunting tool. Hiring signals count as evidence *against* a prospect.
+### You need
 
-## Setup
+- Docker (for Postgres)
+- [uv](https://docs.astral.sh/uv/) (Python 3.12)
+- [Ollama](https://ollama.com/download) on the host
 
-No credentials, API keys, or accounts are needed.
+### Setup (once)
 
 ```bash
-# 1. Python 3.12 environment
-curl -fsSL https://astral.sh/uv/install.sh | sh     # if uv isn't installed
+# 1. Python env
 uv venv --python 3.12
 uv pip install -e ".[dev]"
 
-# 2. Configuration
-cp .env.example .env                                 # defaults match docker-compose.yml
+# 2. Config
+cp .env.example .env
 
 # 3. Database
 docker compose up -d
 .venv/bin/alembic upgrade head
 
-# 4. Local models (Ollama installed separately: https://ollama.com/download)
-ollama pull numind/nuextract3:q4_k_m                 # extraction; namespace is required
-ollama pull qwen3.5:4b                               # generation
+# 4. Models (~7 GB total)
+ollama pull numind/nuextract3:q4_k_m
+ollama pull qwen3.5:4b
 
 # 5. Run
 .venv/bin/uvicorn app.main:app --reload
 ```
 
-Then open <http://127.0.0.1:8000>. `/health` reports database connectivity.
+Open <http://127.0.0.1:8000>. Check `/health` if something looks wrong.
 
-## Development
+### First session
+
+1. **Settings** — set your offer / target profile (who you sell to).
+2. **Companies** — seed a domain (or paste a list). That queues a fetch + LLM jobs.
+3. Wait for jobs (inference on CPU is slow — minutes per page). Watch **Today** / failed jobs.
+4. Open a company → review facts, signals, opportunities, scores.
+5. **Outreach** — prepare a draft, edit, approve; you send it yourself, then log the reply.
+
+LLM work never runs in the browser request. Unchanged pages are skipped.
+
+---
+
+## Day-to-day
+
+| Screen | Use for |
+| --- | --- |
+| Today | High-priority opps, due follow-ups, newly changed prospects |
+| Companies | Seed, browse snapshots and people |
+| Outreach | Drafts, queue, interactions |
+| Settings | Profile, feeds, adapters, exports |
 
 ```bash
-.venv/bin/pytest                 # needs Postgres up; uses a separate test database
+.venv/bin/pytest
 .venv/bin/ruff check app tests
 .venv/bin/mypy app
-.venv/bin/alembic revision --autogenerate -m "description"
 ```
+
+---
 
 ## Layout
 
 ```
-app/
-  main.py            FastAPI app, routes, templates
-  config.py          settings from environment / .env
-  db/                engine, session, declarative base
-  models/            SQLAlchemy models (import every one in __init__.py)
-  services/          one package per pipeline stage, per spec section 14
-  jobs/              scheduled job handlers
-  templates/         Jinja2 + HTMX
-  static/            vendored Pico.css and HTMX — no CDN
-migrations/          Alembic
-spike/               Phase 0 feasibility harness (see spike/README.md)
+app/           FastAPI, models, services, templates
+migrations/    Alembic
+config/        Operator profile YAML
+scripts/       Backup, restore, secrets audit
+deploy/        systemd backup timer
+docs/          Acceptance checklist
+spike/         Phase 0 LLM experiments
 tests/
 ```
 
-## Things that are intentional, not oversights
+---
 
-**Sync SQLAlchemy.** One operator, no concurrency pressure. Async would complicate the job
-handlers for no measurable gain.
-
-**No Redis, Celery, or vector database.** APScheduler with Postgres job rows is sufficient
-for one user. Postgres full-text search is sufficient for a personal dataset. These get
-added when a measured bottleneck demands them, not before (spec section 12.1).
-
-**Ollama on the host, not in Compose.** This machine has no discrete GPU, so the model
-needs direct CPU access.
-
-**Vendored CSS and JS.** The UI works offline and depends on no third-party service.
-
-**LLM calls never happen in a request.** Inference here runs at roughly 4 minutes per page
-on CPU. All model work is background jobs, and unchanged pages are never re-sent to the
-model — that skip is what makes ongoing operation affordable.
-
-**No LinkedIn automation, ever.** The engine recommends a buyer *role* and files a manual
-research task such as “Find Head of Operations on LinkedIn.” It does not scrape LinkedIn,
-does not fetch linkedin.com, and does not guess email addresses from name+domain patterns.
-People are captured only from permitted public company pages (about/team/contact) or entered
-manually by the operator.
-
-## Backups and restore
+## Backups & export
 
 ```bash
-# Nightly dump (also installable as a systemd timer — see deploy/)
 ./scripts/backup_pg.sh
-
-# Restore into the Compose Postgres service (destructive)
 ./scripts/restore_pg.sh backups/prospectiq_YYYYMMDDTHHMMSSZ.sql.gz
 .venv/bin/alembic upgrade head
 ```
 
-Copy `deploy/prospectiq-backup.service` and `deploy/prospectiq-backup.timer` to
-`/etc/systemd/system/`, adjust paths/user, then `systemctl enable --now prospectiq-backup.timer`.
+Exports: `/export/companies.json`, `/export/opportunities.csv`, `/export/interactions.csv`
+(also linked from Settings). Optional nightly timer: `deploy/prospectiq-backup.*`.
 
-## Exports
+---
 
-From Settings or directly:
+## Security notes
 
-- `/export/companies.json`
-- `/export/opportunities.csv`
-- `/export/interactions.csv`
+Bound to `127.0.0.1` with no login by default. If you bind beyond localhost, set
+`AUTH_TOKEN` in `.env`. Secrets stay in `.env` only — run `./scripts/audit_secrets.sh`
+after changes. No LinkedIn scraping; no email guessing.
 
-## Security
-
-Bound to `127.0.0.1` with no authentication by default. If you set `HOST` to a non-loopback
-address, the auth gate activates and requires `AUTH_TOKEN` (P10-7). Secrets live only in
-`.env`, which is gitignored. Fetched web content is sanitized before render. Run
-`./scripts/audit_secrets.sh` after changes.
-
-Acceptance checklist: [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md).
+Acceptance: [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md).
