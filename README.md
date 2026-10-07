@@ -35,8 +35,8 @@ docker compose up -d
 .venv/bin/alembic upgrade head
 
 # 4. Models (~7 GB total)
-ollama pull numind/nuextract3:q4_k_m
-ollama pull qwen3.5:4b
+ollama pull numind/nuextract3:q4_k_m   # reads pages → facts & signals
+ollama pull qwen3.5:4b                # drafts opportunities & outreach
 
 # 5. Run
 .venv/bin/uvicorn app.main:app --reload
@@ -46,24 +46,93 @@ Open <http://127.0.0.1:8000>. Check `/health` if something looks wrong.
 
 ### First session
 
-1. **Settings** — set your offer / target profile (who you sell to).
-2. **Companies** — seed a domain (or paste a list). That queues a fetch + LLM jobs.
-3. Wait for jobs (inference on CPU is slow — minutes per page). Watch **Today** / failed jobs.
-4. Open a company → review facts, signals, opportunities, scores.
-5. **Outreach** — prepare a draft, edit, approve; you send it yourself, then log the reply.
+1. **Settings** — who you sell to and score thresholds.
+2. **Companies → Seed** — paste a domain or URL list.
+3. Wait (CPU inference is slow). Use **Today** and **Failed jobs**.
+4. Open a company → facts → signals → opportunities.
+5. Open an opportunity → prepare outreach → edit/approve → you send → log the reply.
 
-LLM work never runs in the browser request. Unchanged pages are skipped.
+LLM work never runs inside a page click. Unchanged pages are skipped.
 
 ---
 
-## Day-to-day
+## Understand the site
 
-| Screen | Use for |
+Top nav: **Today · Companies · Outreach · Settings**.
+
+### The pipeline (in order)
+
+```
+Seed company → fetch page → snapshot
+  → extract facts → extract signals
+  → score ICP Fit (company) + Opportunity Score (deal idea)
+  → recommend buyer role → draft outreach (you send)
+  → log reply / next action → refresh later on a schedule
+```
+
+| Word | Meaning |
 | --- | --- |
-| Today | High-priority opps, due follow-ups, newly changed prospects |
-| Companies | Seed, browse snapshots and people |
-| Outreach | Drafts, queue, interactions |
-| Settings | Profile, feeds, adapters, exports |
+| Snapshot | Saved copy of a page (text + hash). Evidence lives here. |
+| Fact | Something observed on the page (not a guess). |
+| Signal | A change or cue (product launch, hiring, etc.) with a quote. |
+| Opportunity | A project hypothesis tied to signals — not a guaranteed deal. |
+| ICP Fit | “Is this company our kind of customer?” (no timing signals). |
+| Opportunity Score | “Is this idea worth acting on *now*?” |
+| Priority band | High / Medium / Watch / Reject from your thresholds. |
+
+### Today (`/`)
+
+Your daily desk: high-priority opportunities, drafts/follow-ups due, companies that
+changed, recent snapshots. Link to **Failed jobs** if something broke.
+
+### Companies (`/companies`)
+
+- **Seed** — paste domains/URLs; fetch + research jobs are queued.
+- **List** — all companies and status.
+- **Detail** — ICP Fit + reasons, extracted facts, signals, opportunities, people,
+  snapshot history, good/bad feedback, **Refresh now**.
+
+Open an **opportunity** from here for scores, evidence, buyer role, and outreach.
+
+### Opportunity detail (`/opportunities/…`)
+
+One deal idea: problem, hypothesis, why-now, confidence, evidence quotes, Opportunity
+Score (separate from ICP), buyer role / people, promote to outreach-ready, prepare draft,
+record interactions (sent / reply / next action), lifecycle (watch / nurture / etc.).
+
+### Outreach (`/outreach`)
+
+Queue of drafts and due follow-ups. Open a task → edit draft → **approve** or reject →
+mark sent yourself → come back when they reply. The app never emails for you.
+
+### Settings (`/settings`)
+
+- **Profile** — positioning, industries, regions, exclusions, score bands, refresh days.
+- **Adapters** — which source types exist (company page, RSS, GitHub, …).
+- **Feeds** — add RSS/Atom/changelog URLs; poll, enable/disable, remove.
+- **Playwright** — optional per-domain JS fetch (off by default).
+- **Exports** — download companies / opportunities / interactions.
+
+Models shown here are labels; real model names live in `.env`
+(`EXTRACTION_MODEL`, `GENERATION_MODEL`).
+
+### Jobs (`/jobs/failed`)
+
+Background work that failed (fetch, LLM, etc.). From Today’s footer. Retry or fix the
+underlying issue (Ollama down, bad URL, …).
+
+---
+
+## Day-to-day cheatsheet
+
+| Want to… | Go to |
+| --- | --- |
+| See what needs attention | Today |
+| Add a prospect | Companies → Seed |
+| Judge fit / evidence | Company or opportunity detail |
+| Send / follow up | Outreach |
+| Tune who you target | Settings |
+| Fix broken background work | Failed jobs |
 
 ```bash
 .venv/bin/pytest

@@ -2,13 +2,32 @@
 
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy.orm import Session
 
 from app.auth import requires_auth, resolve_auth_secret
 from app.config import Settings
+from app.main import CorrelationFormatter
 from app.models import Company, Opportunity
 from app.services.export import export_companies_json, export_opportunities_csv
 from app.services.sanitize import sanitize_for_display
+
+
+def test_correlation_formatter_defaults_missing_id() -> None:
+    formatter = CorrelationFormatter(
+        "%(name)s [correlation_id=%(correlation_id)s] %(message)s"
+    )
+    record = logging.LogRecord(
+        name="apscheduler.scheduler",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="Scheduler has been shut down",
+        args=(),
+        exc_info=None,
+    )
+    assert "correlation_id=-" in formatter.format(record)
 
 
 def test_sanitize_escapes_html() -> None:

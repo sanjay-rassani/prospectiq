@@ -36,21 +36,33 @@ from app.services.sanitize import sanitize_for_display
 settings = get_settings()
 
 
-class _CorrelationFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
+_LOG_FORMAT = (
+    "%(asctime)s %(levelname)-8s %(name)s "
+    "[correlation_id=%(correlation_id)s] %(message)s"
+)
+
+
+class CorrelationFormatter(logging.Formatter):
+    """Ensure correlation_id exists even for third-party loggers (e.g. APScheduler).
+
+    A Filter on the root logger is not applied to child-logger records before they
+    hit handlers, so shutdown logs from apscheduler would KeyError without this.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
         if not hasattr(record, "correlation_id"):
             record.correlation_id = "-"
-        return True
+        return super().format(record)
 
 
-logging.basicConfig(
-    level=settings.log_level,
-    format=(
-        "%(asctime)s %(levelname)-8s %(name)s "
-        "[correlation_id=%(correlation_id)s] %(message)s"
-    ),
-)
-logging.getLogger().addFilter(_CorrelationFilter())
+def configure_logging(level: str | int = logging.INFO) -> None:
+    logging.basicConfig(level=level, format=_LOG_FORMAT, force=True)
+    formatter = CorrelationFormatter(_LOG_FORMAT)
+    for handler in logging.getLogger().handlers:
+        handler.setFormatter(formatter)
+
+
+configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).parent
