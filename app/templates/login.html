@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<header>
+  <h1>Login</h1>
+  {% if auth_required %}
+  <p>This instance is bound beyond localhost. Enter the AUTH_TOKEN from <code>.env</code>.</p>
+  {% else %}
+  <p>Auth gate is idle on loopback. You can still set a token for testing.</p>
+  {% endif %}
+</header>
+
+{% if error %}
+<p><mark>{{ error }}</mark></p>
+{% endif %}
+
+<form method="post" action="/login">
+  <label>Token <input type="password" name="token" required autocomplete="current-password"></label>
+  <button type="submit">Continue</button>
+</form>
+{% endblock %}

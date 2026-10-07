@@ -35,6 +35,7 @@ def process_due_jobs(session: Session, *, limit: int = 10) -> list[Job]:
                 job.id,
                 job.job_type,
                 job.attempts,
+                extra={"correlation_id": corr},
             )
             summary = handle_job(session, job)
             complete_job(job)

@@ -21,21 +21,36 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.companies import router as companies_router
+from app.api.export import router as export_router
 from app.api.jobs import router as jobs_router
 from app.api.opportunities import router as opportunities_router
 from app.api.outreach import router as outreach_router
 from app.api.settings import router as settings_router
+from app.auth import LocalhostAuthGate, resolve_auth_secret
 from app.config import get_settings
 from app.db.session import get_session
 from app.jobs.scheduler import start_scheduler, stop_scheduler
 from app.services.monitoring.today import load_today
+from app.services.sanitize import sanitize_for_display
 
 settings = get_settings()
 
+
+class _CorrelationFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not hasattr(record, "correlation_id"):
+            record.correlation_id = "-"
+        return True
+
+
 logging.basicConfig(
     level=settings.log_level,
-    format="%(asctime)s %(levelname)-8s %(name)s %(message)s",
+    format=(
+        "%(asctime)s %(levelname)-8s %(name)s "
+        "[correlation_id=%(correlation_id)s] %(message)s"
+    ),
 )
+logging.getLogger().addFilter(_CorrelationFilter())
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).parent
@@ -58,8 +73,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_auth_secret = resolve_auth_secret(settings)
+app.add_middleware(LocalhostAuthGate, settings=settings, secret=_auth_secret)
+app.state.auth_secret = _auth_secret
+
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+templates.env.filters["sanitize"] = sanitize_for_display
 app.state.templates = templates
 
 app.include_router(companies_router)
@@ -67,6 +87,7 @@ app.include_router(opportunities_router)
 app.include_router(outreach_router)
 app.include_router(jobs_router)
 app.include_router(settings_router)
+app.include_router(export_router)
 
 
 @app.get("/health")

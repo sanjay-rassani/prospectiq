@@ -323,14 +323,19 @@ edits. 80 tests passing.
 
 ## Phase 10 — Hardening
 
-- [ ] **P10-1** Nightly `pg_dump` via systemd timer, with retention.
-- [ ] **P10-2** JSON/CSV export of companies, opportunities, interactions.
-- [ ] **P10-3** Documented restore-from-backup drill, actually performed once.
-- [ ] **P10-4** Structured logging with correlation ids across job runs.
-- [ ] **P10-5** Output sanitization before rendering fetched content (§18 XSS).
-- [ ] **P10-6** Secrets audit: nothing but `.env`; confirm nothing is committed.
-- [ ] **P10-7** Auth gate that activates if bound beyond localhost.
-- [ ] **P10-8** Walk the full §21 acceptance list and tick every line.
+- [x] **P10-1** Nightly `pg_dump` via systemd timer, with retention.
+- [x] **P10-2** JSON/CSV export of companies, opportunities, interactions.
+- [x] **P10-3** Documented restore-from-backup drill, actually performed once.
+- [x] **P10-4** Structured logging with correlation ids across job runs.
+- [x] **P10-5** Output sanitization before rendering fetched content (§18 XSS).
+- [x] **P10-6** Secrets audit: nothing but `.env`; confirm nothing is committed.
+- [x] **P10-7** Auth gate that activates if bound beyond localhost.
+- [x] **P10-8** Walk the full §21 acceptance list and tick every line.
+
+**Milestone reached.** Backup/restore scripts + systemd unit, exports, sanitize filter,
+correlation_id logging, secrets audit script, non-loopback auth gate, and
+`docs/ACCEPTANCE.md` ticked against §21.
+**Acceptance:** local-first hardening complete.
 
 ---
 

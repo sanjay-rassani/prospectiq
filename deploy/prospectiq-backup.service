@@ -1,0 +1,11 @@
+# /etc/systemd/system/prospectiq-backup.service
+[Unit]
+Description=ProspectIQ nightly Postgres backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/jas/code/prospectiq
+ExecStart=/home/jas/code/prospectiq/scripts/backup_pg.sh
+User=jas

@@ -1,0 +1,11 @@
+# /etc/systemd/system/prospectiq-backup.timer
+[Unit]
+Description=Nightly ProspectIQ Postgres backup
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+Unit=prospectiq-backup.service
+
+[Install]
+WantedBy=timers.target

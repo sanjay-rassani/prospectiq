@@ -276,7 +276,7 @@
       · {{ link.signal.strength }}
     </p>
     <p>{{ link.signal.summary }}</p>
-    <blockquote class="evidence">{{ link.signal.evidence_excerpt }}</blockquote>
+    <blockquote class="evidence">{{ link.signal.evidence_excerpt | sanitize }}</blockquote>
     {% if link.signal.source_snapshot_id %}
     <p><small>From <a href="/companies/{{ opportunity.company_id }}#snap-{{ link.signal.source_snapshot_id }}">source snapshot</a></small></p>
     {% endif %}

@@ -50,6 +50,8 @@ class Settings(BaseSettings):
     llm_enabled: bool = True
     # APScheduler in-process tick (Phase 8). Tests disable this.
     scheduler_enabled: bool = True
+    # Shared secret for non-loopback binds (P10-7). Empty → ephemeral token logged once.
+    auth_token: str = ""
 
     # Politeness defaults for the fetcher (spec section 18).
     user_agent: str = "ProspectingEngine/0.1 (personal business research)"

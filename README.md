@@ -96,8 +96,33 @@ does not fetch linkedin.com, and does not guess email addresses from name+domain
 People are captured only from permitted public company pages (about/team/contact) or entered
 manually by the operator.
 
+## Backups and restore
+
+```bash
+# Nightly dump (also installable as a systemd timer — see deploy/)
+./scripts/backup_pg.sh
+
+# Restore into the Compose Postgres service (destructive)
+./scripts/restore_pg.sh backups/prospectiq_YYYYMMDDTHHMMSSZ.sql.gz
+.venv/bin/alembic upgrade head
+```
+
+Copy `deploy/prospectiq-backup.service` and `deploy/prospectiq-backup.timer` to
+`/etc/systemd/system/`, adjust paths/user, then `systemctl enable --now prospectiq-backup.timer`.
+
+## Exports
+
+From Settings or directly:
+
+- `/export/companies.json`
+- `/export/opportunities.csv`
+- `/export/interactions.csv`
+
 ## Security
 
-Bound to `127.0.0.1` with no authentication. Do not expose it to a network until task
-P10-7 adds an auth gate. Secrets live only in `.env`, which is gitignored. Fetched web
-content is treated as untrusted input, both for rendering and as model input.
+Bound to `127.0.0.1` with no authentication by default. If you set `HOST` to a non-loopback
+address, the auth gate activates and requires `AUTH_TOKEN` (P10-7). Secrets live only in
+`.env`, which is gitignored. Fetched web content is sanitized before render. Run
+`./scripts/audit_secrets.sh` after changes.
+
+Acceptance checklist: [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md).
