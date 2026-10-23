@@ -61,6 +61,11 @@ class Settings(BaseSettings):
 
     log_level: str = Field(default="INFO")
 
+    # Optional self-hosted search (SearXNG JSON API). Empty = adapter unavailable.
+    searxng_url: str = ""
+    # Optional GitHub token raises unauthenticated search rate limits.
+    github_token: str = ""
+
     def _dsn(self, database: str) -> str:
         return str(
             PostgresDsn.build(

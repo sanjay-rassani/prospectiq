@@ -5,7 +5,7 @@
 <header class="row">
   <div>
     <h1>Discover</h1>
-    <p>Find companies from public feeds — one step at a time.</p>
+    <p>Describe who you want. ProspectIQ searches permitted public sources for matching leads.</p>
   </div>
   <div class="actions">
     <a href="/companies/seed" role="button" class="secondary outline">Manual seed</a>
@@ -17,16 +17,18 @@
 {% endif %}
 
 <p class="tip">
-  <strong>Free only.</strong> Public RSS/Atom/GitHub feeds + manual seed — no paid search APIs,
-  no Google/LinkedIn login bots.
+  <strong>Automated discovery is the default.</strong> Targeting filters drive Hacker News,
+  UK Contracts Finder, optional SearXNG, and your RSS feeds.
+  Upwork/Fiverr/LinkedIn are listed but <em>not searched</em> (no permitted public API).
+  Manual seed remains for URLs you already have. No Google scrape. No paid APIs required.
 </p>
 
 <nav class="stepper" aria-label="Discover steps">
   <ol class="stepper-list">
-    <li><button type="button" class="stepper-btn" data-goto="1" aria-current="step"><span class="step-num">1</span> Who</button></li>
-    <li><button type="button" class="stepper-btn" data-goto="2"><span class="step-num">2</span> Polling</button></li>
+    <li><button type="button" class="stepper-btn" data-goto="1" aria-current="step"><span class="step-num">1</span> Targeting</button></li>
+    <li><button type="button" class="stepper-btn" data-goto="2"><span class="step-num">2</span> Sources</button></li>
     <li><button type="button" class="stepper-btn" data-goto="3"><span class="step-num">3</span> Feeds</button></li>
-    <li><button type="button" class="stepper-btn" data-goto="4"><span class="step-num">4</span> Live activity</button></li>
+    <li><button type="button" class="stepper-btn" data-goto="4"><span class="step-num">4</span> Run</button></li>
     <li><button type="button" class="stepper-btn" data-goto="5"><span class="step-num">5</span> Results</button></li>
   </ol>
 </nav>
@@ -36,10 +38,10 @@
 
 <section class="step-panel" data-step="1" id="step-1">
   <article>
-    <header><strong>Step 1 — Who to discover</strong></header>
+    <header><strong>Step 1 — Targeting</strong></header>
     <p class="tip">
-      Pick a focus, then tick topics to include or exclude. These filter feed items
-      <em>before</em> seeding. ICP Fit still uses your full <a href="/settings">Settings</a> profile later.
+      Start here. Filters generate source queries and score results.
+      ICP Fit still uses your <a href="/settings">Settings</a> profile after a company is saved.
     </p>
     <label>Focus preset
       <select name="focus_preset" id="focus-preset">
@@ -48,7 +50,83 @@
         {% endfor %}
       </select>
     </label>
-    <p class="tip"><strong>Tip:</strong> A preset ticks the boxes below. Change them, then continue to Polling and Save.</p>
+    <p class="tip"><strong>Tip:</strong> A preset ticks keyword boxes. Lead types and services stay as you set them.</p>
+
+    <fieldset class="choice-fieldset">
+      <legend>Lead type</legend>
+      <div class="choice-grid">
+        {% for key, label in lead_types %}
+        <label class="choice-chip">
+          <input type="checkbox" name="lead_type" value="{{ key }}"
+            {% if key.casefold() in selected_lead_types %}checked{% endif %}>
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <fieldset class="choice-fieldset">
+      <legend>Services you sell</legend>
+      <div class="choice-grid">
+        {% for key, label in services %}
+        <label class="choice-chip">
+          <input type="checkbox" name="service_choice" value="{{ key }}"
+            {% if key.casefold() in selected_services %}checked{% endif %}>
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <fieldset class="choice-fieldset">
+      <legend>Industries</legend>
+      <div class="choice-grid">
+        {% for key, label in industries %}
+        <label class="choice-chip">
+          <input type="checkbox" name="industry_choice" value="{{ key }}"
+            {% if key.casefold() in selected_industries %}checked{% endif %}>
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+      <label>Industry matching
+        <select name="industry_mode">
+          <option value="flexible" {% if discovery.industry_mode != 'strict' %}selected{% endif %}>Flexible — boost matches, keep others</option>
+          <option value="strict" {% if discovery.industry_mode == 'strict' %}selected{% endif %}>Strict — drop listings without industry terms</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <div class="grid">
+      <label>Geography (comma-separated countries / regions / cities)
+        <input type="text" name="geographies" value="{{ discovery.geographies | join(', ') }}"
+          placeholder="UK, EU, remote">
+      </label>
+      <label>Required keywords (must appear)
+        <input type="text" name="required_keywords" value="{{ discovery.required_keywords | join(', ') }}"
+          placeholder="e.g. automation, CRM">
+      </label>
+    </div>
+    <label>
+      <input type="checkbox" name="include_remote" value="on"
+        {% if discovery.include_remote %}checked{% endif %}>
+      Include remote / location-unknown opportunities
+    </label>
+    <div class="grid">
+      <label>Min public budget (optional)
+        <input type="number" name="budget_min" step="1" value="{{ discovery.budget_min or '' }}">
+      </label>
+      <label>Max public budget (optional)
+        <input type="number" name="budget_max" step="1" value="{{ discovery.budget_max or '' }}">
+      </label>
+      <label>Currency
+        <input type="text" name="budget_currency" value="{{ discovery.budget_currency or '' }}" placeholder="GBP">
+      </label>
+      <label>Minimum relevance (0–100)
+        <input type="number" name="min_relevance" min="0" max="100" value="{{ discovery.min_relevance }}">
+      </label>
+    </div>
+    <p class="tip">Budget filters only apply when a listing <em>publishes</em> a value. Missing budgets are not invented.</p>
 
     <fieldset class="choice-fieldset">
       <legend>Include topics <small>(match at least one if any selected)</small></legend>
@@ -110,14 +188,46 @@
 
     <div class="stepper-nav">
       <span></span>
-      <button type="button" class="outline" data-goto="2">Next: Polling →</button>
+      <button type="button" class="outline" data-goto="2">Next: Sources →</button>
     </div>
   </article>
 </section>
 
 <section class="step-panel" data-step="2" id="step-2" hidden>
   <article>
-    <header><strong>Step 2 — Polling behavior</strong></header>
+    <header><strong>Step 2 — Sources</strong></header>
+    <p class="tip">
+      Only <strong>available</strong> sources are searched. Restricted marketplaces stay visible so you know why they are off.
+    </p>
+    <table>
+      <thead>
+        <tr><th></th><th>Source</th><th>Status</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        {% for cap in source_capabilities %}
+        <tr>
+          <td>
+            {% if cap.availability != 'restricted' %}
+            <input type="checkbox" name="source_choice" value="{{ cap.key }}"
+              {% if cap.key.casefold() in selected_sources %}checked{% endif %}>
+            {% endif %}
+          </td>
+          <td>{{ cap.label }}<br><small>{{ cap.category }}</small></td>
+          <td>
+            {% if cap.availability == 'available' %}<span class="band band-high">available</span>
+            {% elif cap.availability == 'optional_config' %}<span class="band band-watch">needs config</span>
+            {% else %}<span class="band band-reject">restricted</span>{% endif %}
+          </td>
+          <td><small>{{ cap.limitations }}{% if cap.requires_config %} · {{ cap.requires_config }}{% endif %}</small></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <label>
+      <input type="checkbox" name="prefer_high_intent" value="on"
+        {% if discovery.prefer_high_intent %}checked{% endif %}>
+      Prefer explicit buying-intent listings over general company matches
+    </label>
     <p class="tip">How hard each <em>Run discovery</em> pass works. Activity logs are live only — not saved to the database.</p>
     <div class="grid">
       <label>Max new entries per feed
@@ -141,7 +251,7 @@
     </label>
     <button type="submit">Save filters &amp; behavior</button>
     <div class="stepper-nav">
-      <button type="button" class="secondary outline" data-goto="1">← Who</button>
+      <button type="button" class="secondary outline" data-goto="1">← Targeting</button>
       <button type="button" class="outline" data-goto="3">Next: Feeds →</button>
     </div>
   </article>
@@ -151,10 +261,10 @@
 
 <section class="step-panel" data-step="3" id="step-3" hidden>
   <article>
-    <header><strong>Step 3 — Feeds (sources)</strong></header>
+    <header><strong>Step 3 — Feeds (supplementary)</strong></header>
     <p class="tip">
-      <strong>Free sources only.</strong> Add RSS/Atom, GitHub <code>releases.atom</code>, or changelog feeds.
-      This is your discovery surface — not a paid Google API.
+      RSS/Atom and GitHub <code>releases.atom</code> remain useful extras — not the only way in.
+      Enable the <em>RSS / Atom</em> source on step 2 to include them in a run.
     </p>
     {% if feeds %}
     <table>
@@ -220,10 +330,10 @@
 
 <section class="step-panel" data-step="4" id="step-4" hidden>
   <article id="activity-panel">
-    <header><strong>Step 4 — Live activity</strong></header>
+    <header><strong>Step 4 — Run discovery</strong></header>
     <p class="tip" id="activity-hint">
-      This panel is separate so you can watch the run without scrolling past filters.
-      Logs are <strong>not stored</strong> — stay on this step while discovery runs.
+      Runs selected adapters in the background. Save targeting first.
+      Logs are <strong>not stored</strong> — stay on this step while it runs.
     </p>
     <div class="actions" style="margin-bottom:0.75rem">
       <button type="button" id="poll-feeds-btn">Run discovery</button>
@@ -239,8 +349,79 @@
 <section class="step-panel" data-step="5" id="step-5" hidden>
   <article>
     <header><strong>Step 5 — Results</strong></header>
-    <p class="tip">Companies seeded from matching feed links. Open one to review facts and opportunities.</p>
+    <p class="tip">
+      Intent class is separate from ICP Fit.
+      <strong>high_intent</strong> = explicit request;
+      <strong>potential_company</strong> = ICP-like without a request;
+      <strong>emerging</strong> = transformation/expansion language;
+      <strong>low_relevance</strong> = weak evidence.
+      Counts:
+      new {{ lead_counts.get('new', 0) }},
+      qualified {{ lead_counts.get('qualified', 0) }},
+      saved {{ lead_counts.get('saved', 0) }},
+      rejected {{ lead_counts.get('rejected', 0) }}.
+    </p>
+    <form method="get" action="/companies/discover" class="filters">
+      <input type="hidden" name="stay" value="5">
+      <label>Intent
+        <select name="intent">
+          <option value="">All</option>
+          {% for v in ['high_intent', 'potential_company', 'emerging', 'low_relevance'] %}
+          <option value="{{ v }}" {% if intent_filter == v %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Status
+        <select name="lead_status">
+          <option value="">All</option>
+          {% for v in ['new', 'qualified', 'saved', 'rejected'] %}
+          <option value="{{ v }}" {% if status_filter == v %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit">Filter</button>
+    </form>
+    {% if leads %}
+    <table>
+      <thead>
+        <tr>
+          <th>Lead</th>
+          <th>Intent</th>
+          <th>Score</th>
+          <th>Source</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+        <tr>
+          <td>
+            <a href="{{ lead.canonical_url }}" target="_blank" rel="noopener">{{ lead.title }}</a>
+            <br><small>{{ lead.lead_kind }}{% if lead.budget_text %} · {{ lead.budget_text }}{% endif %}{% if lead.location_text %} · {{ lead.location_text }}{% endif %}</small>
+            {% if lead.excerpt %}<br><small>{{ lead.excerpt[:180] }}</small>{% endif %}
+          </td>
+          <td><span class="band band-{{ 'high' if lead.intent_class == 'high_intent' else 'medium' if lead.intent_class == 'emerging' else 'watch' if lead.intent_class == 'potential_company' else 'reject' }}">{{ lead.intent_class }}</span></td>
+          <td>{{ '%.0f'|format(lead.relevance_score) }}</td>
+          <td>{{ lead.source_name }}</td>
+          <td>{{ lead.status }}{% if lead.company_id %}<br><a href="/companies/{{ lead.company_id }}">company</a>{% endif %}</td>
+          <td>
+            {% if lead.status != 'rejected' %}
+            <form method="post" action="/leads/{{ lead.id }}/qualify"><button type="submit" class="outline">Qualify</button></form>
+            <form method="post" action="/leads/{{ lead.id }}/save"><button type="submit" class="outline">Save to companies</button></form>
+            <form method="post" action="/leads/{{ lead.id }}/reject"><button type="submit" class="outline contrast">Reject</button></form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>No scored leads yet. Save targeting, then run discovery — or <a href="/companies/seed">seed a known URL</a>.</p>
+    {% endif %}
+
     {% if recent %}
+    <p><strong>Companies recently seeded from feeds</strong></p>
     <table>
       <thead>
         <tr><th>Company</th><th>From feed</th><th>Entry</th><th>When</th></tr>
@@ -258,11 +439,9 @@
         {% endfor %}
       </tbody>
     </table>
-    {% else %}
-    <p>Nothing discovered yet. Finish steps 1–3, then run discovery on step 4 — or <a href="/companies/seed">seed manually</a>.</p>
     {% endif %}
     <div class="stepper-nav">
-      <button type="button" class="secondary outline" data-goto="4">← Live activity</button>
+      <button type="button" class="secondary outline" data-goto="4">← Run</button>
       <a href="/companies" role="button" class="outline">All companies</a>
     </div>
   </article>
@@ -303,7 +482,7 @@
   var hash = (location.hash || "").replace("#step-", "");
   var start = "1";
   if (hash && document.getElementById("step-" + hash)) start = hash;
-  else if ({{ 'true' if recent else 'false' }}) start = "5";
+  else if ({{ 'true' if leads or recent else 'false' }}) start = "5";
   else if ({{ 'true' if feeds else 'false' }}) start = "4";
   goTo(start);
 

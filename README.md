@@ -66,11 +66,12 @@ Top nav: **Today · Companies · Outreach · Settings**.
 ### The pipeline (in order)
 
 ```
-Seed or Discover (feeds) → fetch page → snapshot
+Targeting filters → Discover (HN / UK tenders / optional SearXNG / RSS)
+  → scored leads (intent class ≠ ICP Fit)
+  → qualify / save → fetch page → snapshot
   → extract facts → extract signals
   → score ICP Fit (company) + Opportunity Score (deal idea)
-  → recommend buyer role → draft outreach (you send)
-  → log reply / next action → refresh later on a schedule
+  → recommend buyer role → contacts → draft outreach (you send)
 ```
 
 | Word | Meaning |
@@ -90,10 +91,12 @@ changed, recent snapshots. Link to **Failed jobs** if something broke.
 
 ### Companies (`/companies`)
 
-- **Seed** — paste domains/URLs; fetch + research jobs are queued.
-- **Discover** (`/companies/discover`) — free sources only: filters + public feeds +
-  **Run discovery** (live SSE log, not stored). Same pipeline as Seed after a link matches.
-  No paid search APIs; no Google scrape; no LinkedIn/Google password automation.
+- **Discover** (`/companies/discover`) — **default lead-gen path.** Set lead type, services,
+  industries, geography, and keywords; pick permitted sources; **Run discovery** (live SSE).
+  Results are scored leads (high-intent project vs potential company vs emerging vs low
+  relevance), not automatic companies. Qualify / reject / save into the research pipeline.
+- **Seed** — paste domains/URLs you already know (secondary).
+- **Feeds** — optional RSS/Atom/GitHub releases still work as a supplementary source.
 - **List** — all companies and status.
 - **Detail** — ICP Fit + reasons, extracted facts, signals, opportunities, **contacts**,
   snapshot history, good/bad feedback, **Refresh now**, delete.
@@ -157,7 +160,7 @@ underlying issue (Ollama down, bad URL, …).
 | --- | --- |
 | See what needs attention | Today |
 | Add a known prospect | Companies → Seed |
-| Find prospects from feeds | Companies → Discover |
+| Find new leads | Companies → Discover (targeting + Run) |
 | Remove a prospect | Companies → Delete (cascades all related data) |
 | Judge fit / evidence | Company or opportunity detail |
 | Find / enrich people | Company → Discover contacts, or Contacts |
@@ -204,6 +207,26 @@ tests/
 
 Exports: `/export/companies.json`, `/export/opportunities.csv`, `/export/interactions.csv`
 (also linked from Settings). Optional nightly timer: `deploy/prospectiq-backup.*`.
+
+---
+
+## Lead discovery sources (what actually runs)
+
+| Source | Status | Config |
+| --- | --- | --- |
+| Hacker News (Algolia public API) | **On by default** | None |
+| UK Contracts Finder (public OCDS search) | **On by default** | None |
+| RSS / Atom / GitHub releases.atom | Supplementary | Add feeds on Discover |
+| SearXNG | Optional | `SEARXNG_URL` (self-hosted JSON API) |
+| GitHub public issues | Optional, off by default | `GITHUB_TOKEN` recommended |
+| Upwork / Fiverr | **Restricted** — not searched | Import a listing URL via Seed |
+| LinkedIn / Google HTML | **Never** | — |
+
+Intent class on a lead is **not** ICP Fit. Saving a lead with a company domain runs the existing snapshot/research pipeline. Project listings on HN/tender hosts stay as leads until you seed an organization URL. Contact discovery is a later, separate step.
+
+```bash
+.venv/bin/alembic upgrade head
+```
 
 ---
 

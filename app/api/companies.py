@@ -16,11 +16,13 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.config import get_settings
 from app.db.session import SessionLocal, get_session
 from app.models import Company, FeedEntry, SourceFeed, SourceSnapshot
+from app.models.lead import DiscoveryLead, LeadStatus
 from app.services.buyers.capture import add_manual_person
 from app.services.discovery.delete_company import delete_company
-from app.services.discovery.rss import add_feed, poll_all_feeds
+from app.services.discovery.rss import add_feed
 from app.services.discovery.seed import refresh_company, seed_targets
 from app.services.discovery.suggestions import (
     DISCOVER_PRESETS,
@@ -32,6 +34,10 @@ from app.services.discovery.suggestions import (
     feed_suggestions_map,
     preset_choices,
 )
+from app.services.leads.adapters import list_capabilities
+from app.services.leads.engine import run_lead_discovery
+from app.services.leads.filters import INDUSTRIES, LEAD_TYPES, SERVICES, filters_from_prefs
+from app.services.leads.persist import company_domain_from_lead
 from app.services.scoring.profile import (
     DEFAULT_PROFILE_PATH,
     get_operator_profile,
@@ -84,7 +90,7 @@ def seed_form(request: Request) -> HTMLResponse:
 
 @router.get("/companies/discover", response_class=HTMLResponse)
 def discover_page(request: Request, session: SessionDep) -> HTMLResponse:
-    """Auto-discovery via permitted feeds (not Google scrape / no platform logins)."""
+    """Filter-driven discovery across permitted public sources."""
     templates = get_templates(request)
     profile = get_operator_profile()
     feeds = session.scalars(select(SourceFeed).order_by(SourceFeed.name)).all()
@@ -106,6 +112,27 @@ def discover_page(request: Request, session: SessionDep) -> HTMLResponse:
     custom_excludes_value = ", ".join(
         k for k in profile.discovery.exclude_keywords if k.casefold() not in catalog_ex
     )
+    intent_filter = request.query_params.get("intent") or ""
+    status_filter = request.query_params.get("lead_status") or ""
+    lead_stmt = select(DiscoveryLead).order_by(
+        DiscoveryLead.relevance_score.desc(), DiscoveryLead.discovered_at.desc()
+    )
+    if intent_filter:
+        lead_stmt = lead_stmt.where(DiscoveryLead.intent_class == intent_filter)
+    if status_filter:
+        lead_stmt = lead_stmt.where(DiscoveryLead.status == status_filter)
+    leads = list(session.scalars(lead_stmt.limit(100)).all())
+    lead_counts = dict(
+        session.execute(
+            select(DiscoveryLead.status, func.count()).group_by(DiscoveryLead.status)
+        ).all()
+    )
+    selected_lead_types = {t.casefold() for t in profile.discovery.lead_types}
+    selected_services = {s.casefold() for s in profile.discovery.services}
+    selected_industries = {i.casefold() for i in profile.discovery.industries}
+    selected_sources = {s.casefold() for s in profile.discovery.enabled_sources}
+    if not selected_sources:
+        selected_sources = {"hackernews", "contracts_uk", "rss_feeds"}
     return templates.TemplateResponse(
         request=request,
         name="companies/discover.html",
@@ -113,6 +140,10 @@ def discover_page(request: Request, session: SessionDep) -> HTMLResponse:
             "title": "Discover",
             "feeds": feeds,
             "recent": recent,
+            "leads": leads,
+            "lead_counts": lead_counts,
+            "intent_filter": intent_filter,
+            "status_filter": status_filter,
             "profile": profile,
             "discovery": profile.discovery,
             "keyword_groups": KEYWORD_GROUPS,
@@ -137,6 +168,14 @@ def discover_page(request: Request, session: SessionDep) -> HTMLResponse:
             "custom_excludes_value": custom_excludes_value,
             "feed_suggestion_groups": feed_suggestions_by_group(),
             "feed_suggestion_map": feed_suggestions_map(),
+            "lead_types": LEAD_TYPES,
+            "services": SERVICES,
+            "industries": INDUSTRIES,
+            "selected_lead_types": selected_lead_types,
+            "selected_services": selected_services,
+            "selected_industries": selected_industries,
+            "selected_sources": selected_sources,
+            "source_capabilities": list_capabilities(get_settings()),
             "flash": request.query_params.get("flash"),
         },
     )
@@ -182,6 +221,21 @@ async def discover_save_prefs(request: Request) -> RedirectResponse:
         max_seeds = int(str(form.get("max_seeds_per_poll") or "15"))
     except ValueError:
         max_seeds = 15
+    try:
+        min_relevance = int(str(form.get("min_relevance") or "30"))
+    except ValueError:
+        min_relevance = 30
+    budget_min = None
+    budget_max = None
+    try:
+        raw_min = str(form.get("budget_min") or "").strip()
+        if raw_min:
+            budget_min = float(raw_min)
+        raw_max = str(form.get("budget_max") or "").strip()
+        if raw_max:
+            budget_max = float(raw_max)
+    except ValueError:
+        pass
 
     data: dict[str, Any] = {}
     if DEFAULT_PROFILE_PATH.exists():
@@ -189,7 +243,9 @@ async def discover_save_prefs(request: Request) -> RedirectResponse:
     data["discovery"] = {
         "focus_preset": focus_preset,
         "keywords": keywords,
+        "optional_keywords": keywords,
         "exclude_keywords": exclude_keywords,
+        "required_keywords": _split_csv(str(form.get("required_keywords") or "")),
         "use_profile_industries_as_keywords": bool(
             form.get("use_profile_industries_as_keywords")
         ),
@@ -198,6 +254,19 @@ async def discover_save_prefs(request: Request) -> RedirectResponse:
         "only_unknown_domains": bool(form.get("only_unknown_domains")),
         "max_new_entries_per_feed": max(1, min(max_entries, 200)),
         "max_seeds_per_poll": max(0, min(max_seeds, 100)),
+        "lead_types": [str(v) for v in form.getlist("lead_type")],
+        "services": [str(v) for v in form.getlist("service_choice")],
+        "industries": [str(v) for v in form.getlist("industry_choice")],
+        "industry_mode": str(form.get("industry_mode") or "flexible"),
+        "geographies": _split_csv(str(form.get("geographies") or "")),
+        "include_remote": bool(form.get("include_remote")),
+        "min_relevance": max(0, min(min_relevance, 100)),
+        "enabled_sources": [str(v) for v in form.getlist("source_choice")]
+        or ["hackernews", "contracts_uk", "rss_feeds"],
+        "prefer_high_intent": bool(form.get("prefer_high_intent")),
+        "budget_min": budget_min,
+        "budget_max": budget_max,
+        "budget_currency": str(form.get("budget_currency") or "").strip()[:8],
     }
     DEFAULT_PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     DEFAULT_PROFILE_PATH.write_text(
@@ -219,22 +288,23 @@ def discover_poll_stream() -> StreamingResponse:
     def worker() -> None:
         session = SessionLocal()
         try:
-            reload_operator_profile()
-
             def on_progress(level: str, message: str) -> None:
                 q.put({"level": level, "message": message})
 
-            stats = poll_all_feeds(session, on_progress=on_progress)
-            session.commit()
-            summary = (
-                f"Done — {stats['feeds']} feed(s), "
-                f"{stats['new_entries']} new entr{'y' if stats['new_entries'] == 1 else 'ies'}, "
-                f"{stats['seeded']} compan{'y' if stats['seeded'] == 1 else 'ies'} seeded"
+            profile = reload_operator_profile()
+            filters = filters_from_prefs(profile.discovery, profile)
+            result = run_lead_discovery(
+                session, filters, on_progress=on_progress
             )
-            if stats.get("filtered"):
-                summary += f", {stats['filtered']} filtered"
+            session.commit()
+            stats = result.as_dict()
+            summary = (
+                f"Done — {stats['created']} new lead(s), "
+                f"{stats['updated']} updated, {stats['filtered']} filtered, "
+                f"{stats['seeded']} saved to companies"
+            )
             if stats["errors"]:
-                summary += f", {stats['errors']} error(s)"
+                summary += f", {stats['errors']} source error(s)"
             q.put({"level": "done", "message": summary, "stats": stats})
         except Exception as exc:
             session.rollback()
@@ -282,6 +352,66 @@ def discover_add_feed(
     return RedirectResponse(
         url="/companies/discover?flash=Feed added - poll to import new links",
         status_code=303,
+    )
+
+
+@router.post("/leads/{lead_id}/qualify")
+def lead_qualify(session: SessionDep, lead_id: UUID) -> RedirectResponse:
+    lead = session.get(DiscoveryLead, lead_id)
+    if lead is None:
+        return RedirectResponse(url="/companies/discover?flash=Lead not found", status_code=303)
+    lead.status = LeadStatus.QUALIFIED.value
+    session.flush()
+    return RedirectResponse(
+        url="/companies/discover?flash=Lead qualified#step-5", status_code=303
+    )
+
+
+@router.post("/leads/{lead_id}/reject")
+def lead_reject(session: SessionDep, lead_id: UUID) -> RedirectResponse:
+    lead = session.get(DiscoveryLead, lead_id)
+    if lead is None:
+        return RedirectResponse(url="/companies/discover?flash=Lead not found", status_code=303)
+    lead.status = LeadStatus.REJECTED.value
+    session.flush()
+    return RedirectResponse(
+        url="/companies/discover?flash=Lead rejected#step-5", status_code=303
+    )
+
+
+@router.post("/leads/{lead_id}/save")
+def lead_save(session: SessionDep, lead_id: UUID) -> RedirectResponse:
+    lead = session.get(DiscoveryLead, lead_id)
+    if lead is None:
+        return RedirectResponse(url="/companies/discover?flash=Lead not found", status_code=303)
+    domain = company_domain_from_lead(lead)
+    if not domain:
+        lead.status = LeadStatus.QUALIFIED.value
+        session.flush()
+        return RedirectResponse(
+            url=(
+                "/companies/discover?flash="
+                "No company domain on this listing — qualified, seed the URL manually"
+                "#step-5"
+            ),
+            status_code=303,
+        )
+    try:
+        outcomes = seed_targets(session, f"https://{domain}")
+    except ValueError as exc:
+        return RedirectResponse(
+            url=f"/companies/discover?flash={exc}#step-5", status_code=303
+        )
+    if outcomes:
+        lead.company_id = outcomes[0].company.id
+        lead.status = LeadStatus.SAVED.value
+        session.flush()
+        return RedirectResponse(
+            url=f"/companies/{outcomes[0].company.id}?flash=Saved from discovery",
+            status_code=303,
+        )
+    return RedirectResponse(
+        url="/companies/discover?flash=Could not save company#step-5", status_code=303
     )
 
 

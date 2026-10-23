@@ -56,6 +56,29 @@ class DiscoverPrefs(BaseModel):
     max_new_entries_per_feed: int = 25
     max_seeds_per_poll: int = 15
     only_unknown_domains: bool = True
+    lead_types: list[str] = Field(
+        default_factory=lambda: [
+            "project_request",
+            "company_seeking_dev",
+            "startup",
+            "sme",
+        ]
+    )
+    services: list[str] = Field(default_factory=list)
+    industries: list[str] = Field(default_factory=list)
+    industry_mode: str = "flexible"
+    geographies: list[str] = Field(default_factory=list)
+    include_remote: bool = True
+    required_keywords: list[str] = Field(default_factory=list)
+    optional_keywords: list[str] = Field(default_factory=list)
+    min_relevance: int = 30
+    enabled_sources: list[str] = Field(
+        default_factory=lambda: ["hackernews", "contracts_uk", "rss_feeds"]
+    )
+    prefer_high_intent: bool = True
+    budget_min: float | None = None
+    budget_max: float | None = None
+    budget_currency: str = ""
 
 
 class OperatorProfile(BaseModel):
