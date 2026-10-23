@@ -26,7 +26,10 @@ def test_adapter_registry() -> None:
     kinds = {a.kind for a in adapters}
     assert AdapterKind.RSS.value in kinds
     assert AdapterKind.GITHUB_RELEASES.value in kinds
+    assert "web_search" in kinds  # documented extension; not wired
     assert get_adapter("rss") is not None
+    assert get_adapter("web_search") is not None
+    assert get_adapter("web_search") and not get_adapter("web_search").enabled_by_default
 
 
 def test_add_and_poll_rss_feed(session: Session, monkeypatch: object) -> None:

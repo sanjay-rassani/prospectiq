@@ -383,3 +383,4 @@ Record as we go, with reasoning. Seeded with what's already settled:
 | D-23 | Drop signals whose excerpt is not in source text | Spec §6.2: fabricated evidence must never persist |
 | D-24 | Discard opportunities that cite only `negative_weak` | Deterministic block on job-hunting drift (extends D-12) |
 | D-25 | Supersede active opportunities on signal-triggered re-eval | Change-triggered refresh (P4-9) without mutating history |
+| D-26 | Discover = free sources only (feeds + seed); no paid search; no Google/LinkedIn login bots | Operator rule: zero paid APIs; scraping SERPs/social with credentials is ToS-risky and brittle |

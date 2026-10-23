@@ -7,6 +7,12 @@
   <p>Operator profile, adapters, feeds, and fetch policies. Profile file: <code>{{ profile_path }}</code></p>
 </header>
 
+<p class="tip">
+  <strong>Tip:</strong> Profile drives ICP Fit and priority bands.
+  Feeds power auto-discovery (also on <a href="/companies/discover">Discover</a>).
+  No Google scrape — use permitted RSS/technical sources only.
+</p>
+
 {% if flash %}
 <p><mark>{{ flash }}</mark></p>
 {% endif %}
@@ -79,6 +85,10 @@
 
 <article>
   <header><strong>Feeds</strong></header>
+  <p class="tip">
+    When a feed item has a company URL, polling seeds that domain like manual seed.
+    Prefer industry blogs, product changelogs, and GitHub <code>releases.atom</code>.
+  </p>
   {% if feeds %}
   <table>
     <thead>

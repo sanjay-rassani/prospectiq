@@ -4,7 +4,8 @@ Self-hosted B2B prospecting for one operator. You seed companies from public pag
 engine snapshots evidence, detects change, scores fit, and drafts outreach you review and
 send yourself.
 
-**No paid APIs.** Postgres in Docker + local Ollama only.  
+**No paid APIs — free only.** Postgres in Docker + local Ollama; discovery via public
+feeds and manual seed (not paid search, not Google/LinkedIn login bots).  
 **Evidence or it doesn't exist.** Every signal links to a stored page snapshot.  
 **Not a job board.** Hiring signals count *against* a prospect.
 
@@ -47,12 +48,14 @@ Open <http://127.0.0.1:8000>. Check `/health` if something looks wrong.
 ### First session
 
 1. **Settings** — who you sell to and score thresholds.
-2. **Companies → Seed** — paste a domain or URL list.
+2. Add companies:
+   - **Seed** — paste domains/URLs you already know, or
+   - **Discover** — add RSS/Atom/GitHub-release feeds; poll to import new company links.
 3. Wait (CPU inference is slow). Use **Today** and **Failed jobs**.
 4. Open a company → facts → signals → opportunities.
 5. Open an opportunity → prepare outreach → edit/approve → you send → log the reply.
 
-LLM work never runs inside a page click. Unchanged pages are skipped.
+No Google scrape and no auto-email. LLM work never runs inside a page click. Unchanged pages are skipped.
 
 ---
 
@@ -63,7 +66,7 @@ Top nav: **Today · Companies · Outreach · Settings**.
 ### The pipeline (in order)
 
 ```
-Seed company → fetch page → snapshot
+Seed or Discover (feeds) → fetch page → snapshot
   → extract facts → extract signals
   → score ICP Fit (company) + Opportunity Score (deal idea)
   → recommend buyer role → draft outreach (you send)
@@ -88,12 +91,15 @@ changed, recent snapshots. Link to **Failed jobs** if something broke.
 ### Companies (`/companies`)
 
 - **Seed** — paste domains/URLs; fetch + research jobs are queued.
+- **Discover** (`/companies/discover`) — free sources only: filters + public feeds +
+  **Run discovery** (live SSE log, not stored). Same pipeline as Seed after a link matches.
+  No paid search APIs; no Google scrape; no LinkedIn/Google password automation.
 - **List** — all companies and status.
 - **Detail** — ICP Fit + reasons, extracted facts, signals, opportunities, people,
-  snapshot history, good/bad feedback, **Refresh now**.
+  snapshot history, good/bad feedback, **Refresh now**, delete.
 
 Open an **opportunity** from here for scores, evidence, buyer role, and outreach.
-
+Short tips appear on Today, Companies, Seed, Discover, Outreach, and Settings.
 ### Opportunity detail (`/opportunities/…`)
 
 One deal idea: problem, hypothesis, why-now, confidence, evidence quotes, Opportunity
@@ -128,7 +134,9 @@ underlying issue (Ollama down, bad URL, …).
 | Want to… | Go to |
 | --- | --- |
 | See what needs attention | Today |
-| Add a prospect | Companies → Seed |
+| Add a known prospect | Companies → Seed |
+| Find prospects from feeds | Companies → Discover |
+| Remove a prospect | Companies → Delete (cascades all related data) |
 | Judge fit / evidence | Company or opportunity detail |
 | Send / follow up | Outreach |
 | Tune who you target | Settings |

@@ -2,10 +2,20 @@
 {% set active = 'companies' %}
 
 {% block content %}
-<h1>Seed companies</h1>
-<p>
-  Paste one entry per line: a domain, a URL, or <code>Name | domain</code>.
-  The engine fetches each page once, stores a source snapshot, and deduplicates by domain.
+<header class="row">
+  <div>
+    <h1>Seed companies</h1>
+    <p>Paste domains you already know. Deduplicated by normalized domain.</p>
+  </div>
+  <div>
+    <a href="/companies/discover" role="button" class="secondary outline">Discover from feeds</a>
+  </div>
+</header>
+
+<p class="tip">
+  <strong>Tip:</strong> One entry per line — domain, URL, or <code>Name | domain</code>.
+  Each fetch stores a snapshot used as evidence later. For automatic finds from news/releases,
+  use <a href="/companies/discover">Discover</a> instead.
 </p>
 
 {% if error %}

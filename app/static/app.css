@@ -41,6 +41,136 @@ header.row {
 
 header.row h1 { margin-bottom: 0.25rem; }
 
+header.row .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+header.row .actions form { margin: 0; }
+
+.tip {
+  border-left: 3px solid var(--pico-primary, #1095c1);
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0 1rem;
+  font-size: 0.9rem;
+  color: var(--pico-muted-color);
+  background: color-mix(in srgb, var(--pico-primary, #1095c1) 8%, transparent);
+}
+.tip strong { color: var(--pico-color); }
+
+.choice-fieldset {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem 1rem;
+}
+.choice-group-label {
+  margin: 0.75rem 0 0.35rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.choice-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.choice-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+.choice-chip input { margin: 0; width: auto; }
+
+.stepper {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.stepper-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.stepper-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--pico-muted-color);
+  cursor: pointer;
+  width: auto;
+}
+.stepper-btn .step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--pico-muted-border-color);
+  color: var(--pico-color);
+}
+.stepper-btn[aria-current="step"] {
+  border-color: var(--pico-primary, #1095c1);
+  color: var(--pico-color);
+  background: color-mix(in srgb, var(--pico-primary, #1095c1) 12%, transparent);
+}
+.stepper-btn[aria-current="step"] .step-num {
+  background: var(--pico-primary, #1095c1);
+  color: #fff;
+}
+.step-panel[hidden] { display: none !important; }
+.stepper-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--pico-muted-border-color);
+}
+.stepper-nav button,
+.stepper-nav a[role="button"] {
+  width: auto;
+  margin: 0;
+}
+
+.terminal-log {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  min-height: 8rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #d6deeb;
+  background: #1b1f24;
+  border-radius: 0.25rem;
+  border: 1px solid #2c333a;
+}
+.terminal-log:empty::before {
+  content: "Waiting for Run discovery…";
+  color: #6b7280;
+}
+
 mark {
   display: inline-block;
   padding: 0.35rem 0.6rem;

@@ -44,6 +44,20 @@ class OutreachSettings(BaseModel):
     scheduler_tick_seconds: int = 60
 
 
+class DiscoverPrefs(BaseModel):
+    """Discover filters + poll behavior. Logs stay in the UI only (not persisted)."""
+
+    focus_preset: str = "custom"
+    keywords: list[str] = Field(default_factory=list)
+    exclude_keywords: list[str] = Field(default_factory=list)
+    use_profile_industries_as_keywords: bool = True
+    skip_social_hosts: bool = True
+    seed_new_links: bool = True
+    max_new_entries_per_feed: int = 25
+    max_seeds_per_poll: int = 15
+    only_unknown_domains: bool = True
+
+
 class OperatorProfile(BaseModel):
     positioning: str = "Software and AI solutions provider"
     capabilities: list[str] = Field(default_factory=list)
@@ -56,6 +70,7 @@ class OperatorProfile(BaseModel):
     allow_agency_white_label: bool = True
     thresholds: ScoreThresholds = Field(default_factory=ScoreThresholds)
     outreach: OutreachSettings = Field(default_factory=OutreachSettings)
+    discovery: DiscoverPrefs = Field(default_factory=DiscoverPrefs)
 
 
 def _load_raw(path: Path) -> dict[str, Any]:

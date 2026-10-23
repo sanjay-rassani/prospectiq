@@ -20,9 +20,13 @@
       {% if company.seed_url %} · <a href="{{ company.seed_url }}" target="_blank" rel="noopener">seed URL</a>{% endif %}
     </p>
   </div>
-  <div>
+  <div class="actions">
     <form method="post" action="/companies/{{ company.id }}/refresh">
       <button type="submit">Refresh now</button>
+    </form>
+    <form method="post" action="/companies/{{ company.id }}/delete"
+          onsubmit="return confirm('Delete this company and all related data? This cannot be undone.');">
+      <button type="submit" class="outline contrast">Delete company</button>
     </form>
   </div>
 </header>

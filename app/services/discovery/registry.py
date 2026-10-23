@@ -30,7 +30,10 @@ ADAPTER_REGISTRY: dict[str, AdapterSpec] = {
     AdapterKind.RSS.value: AdapterSpec(
         kind=AdapterKind.RSS.value,
         label="RSS / Atom",
-        description="Poll feeds; dedupe by entry id/link; seed companies from item links.",
+        description=(
+            "Primary auto-discovery: poll feeds, dedupe by entry id/link, "
+            "seed companies from item links into the same pipeline as manual seed."
+        ),
     ),
     AdapterKind.GITHUB_RELEASES.value: AdapterSpec(
         kind=AdapterKind.GITHUB_RELEASES.value,
@@ -42,6 +45,17 @@ ADAPTER_REGISTRY: dict[str, AdapterSpec] = {
         kind=AdapterKind.CHANGELOG.value,
         label="Changelog page",
         description="Optional public changelog/news URL treated like a company page.",
+        enabled_by_default=False,
+    ),
+    # Free-only policy (D-26): no paid search APIs; no Google/LinkedIn scrape or login bots.
+    "web_search": AdapterSpec(
+        kind="web_search",
+        label="Web search (not wired)",
+        description=(
+            "Reserved. Free path = RSS/feeds, manual seed, or a self-hosted free engine "
+            "(e.g. SearXNG) you run yourself — never paid SerpAPIs, never scrape Google/"
+            "LinkedIn, never store platform passwords."
+        ),
         enabled_by_default=False,
     ),
 }

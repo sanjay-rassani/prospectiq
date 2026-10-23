@@ -158,30 +158,19 @@ def _handle_check_stale(session: Session, job: Job) -> str:
 
 
 def _handle_poll_feeds(session: Session, job: Job) -> str:
-    from app.models import SourceFeed
-    from app.services.discovery.rss import poll_feed
+    from app.services.discovery.rss import poll_all_feeds
 
-    feeds = session.scalars(
-        select(SourceFeed).where(SourceFeed.enabled.is_(True))
-    ).all()
-    new_total = 0
-    seeded_total = 0
-    errors = 0
-    for feed in feeds:
-        try:
-            stats = poll_feed(session, feed)
-            new_total += int(stats.get("new_entries", 0))
-            seeded_total += int(stats.get("seeded", 0))
-        except Exception:
-            errors += 1
-            logger.exception("poll feed %s failed", feed.url)
+    stats = poll_all_feeds(session)
     enqueue_job(
         session,
         JobType.POLL_FEEDS.value,
         due_at=datetime.now(UTC) + timedelta(hours=6),
         dedupe_pending=True,
     )
-    return f"feeds={len(feeds)} new={new_total} seeded={seeded_total} errors={errors}"
+    return (
+        f"feeds={stats['feeds']} new={stats['new_entries']} "
+        f"seeded={stats['seeded']} errors={stats['errors']}"
+    )
 
 
 def ensure_maintenance_jobs(session: Session) -> None:

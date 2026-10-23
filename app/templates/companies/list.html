@@ -7,10 +7,16 @@
     <h1>Companies</h1>
     <p>Seeded and monitored companies. Deduplicated by normalized domain.</p>
   </div>
-  <div>
-    <a href="/companies/seed" role="button">Seed companies</a>
+  <div class="actions">
+    <a href="/companies/seed" role="button">Seed</a>
+    <a href="/companies/discover" role="button" class="secondary">Discover</a>
   </div>
 </header>
+
+<p class="tip">
+  <strong>Tip:</strong> <em>Seed</em> = you paste domains. <em>Discover</em> = feeds bring candidates in.
+  Open a company to review facts, signals, and opportunities before outreach.
+</p>
 
 {% if flash %}
 <p><mark>{{ flash }}</mark></p>
@@ -26,6 +32,7 @@
       <th>ICP Fit</th>
       <th>Snapshots</th>
       <th>Last researched</th>
+      <th></th>
     </tr>
   </thead>
   <tbody>
@@ -42,13 +49,23 @@
       </td>
       <td>{{ snapshot_counts.get(company.id, 0) }}</td>
       <td>{{ company.last_researched_at or "—" }}</td>
+      <td>
+        <form method="post" action="/companies/{{ company.id }}/delete"
+              onsubmit="return confirm('Delete this company and all related data? This cannot be undone.');">
+          <button type="submit" class="outline contrast">Delete</button>
+        </form>
+      </td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 {% else %}
 <article>
-  <p>No companies yet. <a href="/companies/seed">Seed a domain or URL</a> to begin.</p>
+  <p>
+    No companies yet.
+    <a href="/companies/seed">Seed a domain</a>
+    or <a href="/companies/discover">discover from feeds</a>.
+  </p>
 </article>
 {% endif %}
 {% endblock %}
