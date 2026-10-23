@@ -4,19 +4,13 @@
 {% block content %}
 <header class="row">
   <div>
-    <h1>Seed companies</h1>
-    <p>Paste domains you already know. Deduplicated by normalized domain.</p>
+    <h1>Seed</h1>
+    <p>Paste domains or URLs you already know.</p>
   </div>
   <div>
-    <a href="/companies/discover" role="button" class="secondary outline">Discover from feeds</a>
+    <a href="/companies/discover" role="button" class="secondary outline">Discover</a>
   </div>
 </header>
-
-<p class="tip">
-  <strong>Tip:</strong> One entry per line — domain, URL, or <code>Name | domain</code>.
-  Each fetch stores a snapshot used as evidence later. For automatic finds from news/releases,
-  use <a href="/companies/discover">Discover</a> instead.
-</p>
 
 {% if error %}
 <p><mark>{{ error }}</mark></p>
@@ -24,11 +18,11 @@
 
 <form method="post" action="/companies/seed">
   <label for="blob">
-    Companies
-    <textarea id="blob" name="blob" rows="12" required
+    One per line
+    <textarea id="blob" name="blob" rows="10" required
       placeholder="example.com&#10;https://acme.io/about&#10;Northwind | northwind.example">{{ blob }}</textarea>
   </label>
-  <button type="submit">Fetch and store</button>
+  <button type="submit">Fetch</button>
   <a href="/companies" role="button" class="secondary outline">Cancel</a>
 </form>
 {% endblock %}

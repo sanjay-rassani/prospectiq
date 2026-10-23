@@ -39,6 +39,8 @@ def handle_job(session: Session, job: Job) -> str:
         return _handle_poll_feeds(session, job)
     if job.job_type == JobType.DISCOVER_CONTACTS.value:
         return _handle_discover_contacts(session, job)
+    if job.job_type == JobType.DISCOVER_LEADS.value:
+        return _handle_discover_leads(session, job)
     raise ValueError(f"Unknown job type: {job.job_type}")
 
 
@@ -191,6 +193,20 @@ def _handle_discover_contacts(session: Session, job: Job) -> str:
         # Partial failure with no progress — surface for retry.
         raise RuntimeError("; ".join(result.errors[:3]))
     return result.message
+
+
+def _handle_discover_leads(session: Session, job: Job) -> str:
+    from app.services.leads.engine import run_lead_discovery
+    from app.services.leads.filters import filters_from_prefs
+    from app.services.scoring.profile import get_operator_profile
+
+    profile = get_operator_profile()
+    filters = filters_from_prefs(profile.discovery, profile)
+    stats = run_lead_discovery(session, filters)
+    return (
+        f"leads +{stats.created} updated={stats.updated} "
+        f"seeded={stats.seeded} errors={len(stats.errors)}"
+    )
 
 
 def ensure_maintenance_jobs(session: Session) -> None:
