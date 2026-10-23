@@ -14,8 +14,8 @@
   <h1>{{ task.opportunity.company.name }}</h1>
   <p>
     {{ task.opportunity.title }}
-    · {{ task.channel }}
-    · {{ task.status }}
+    · {{ task.channel | status_badge('channel') }}
+    · {{ task.status | status_badge('outreach') }}
     {% if task.person %} · {{ task.person.name }}{% endif %}
   </p>
 </header>

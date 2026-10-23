@@ -430,7 +430,25 @@ def test_contacts_filters_and_opportunity_outreach(session: Session, client) -> 
 
     r_opp = client.get(f"/opportunities/{opp.id}")
     assert r_opp.status_code == 200
-    assert "Recommended contacts" in r_opp.text or "Ops Lead" in r_opp.text
+    assert "Ops Lead" in r_opp.text
+    assert "Find contact" in r_opp.text
+    assert "Find contacts on website" in r_opp.text
+    assert "Open LinkedIn search" in r_opp.text
+    assert "Ready to approach" in r_opp.text
+    assert 'title="' in r_opp.text
+
+    r_find = client.post(
+        f"/opportunities/{opp.id}/discover-contacts",
+        follow_redirects=False,
+    )
+    assert r_find.status_code == 303
+    loc = r_find.headers.get("location", "")
+    assert "finding=1" in loc
+    assert "step=2" in loc
+
+    r_status = client.get(f"/opportunities/{opp.id}/discover-contacts/status")
+    assert r_status.status_code == 200
+    assert r_status.json()["busy"] is True
 
     r_out = client.post(
         f"/opportunities/{opp.id}/outreach",

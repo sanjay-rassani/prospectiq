@@ -317,12 +317,8 @@
               {% if lead.excerpt %}<br><small class="muted">{{ lead.excerpt[:120] }}</small>{% endif %}
             </td>
             <td>
-              <span class="band band-{{ 'high' if lead.intent_class == 'high_intent' else 'medium' if lead.intent_class == 'emerging' else 'watch' if lead.intent_class == 'potential_company' else 'reject' }}">
-                {% if lead.intent_class == 'high_intent' %}high
-                {% elif lead.intent_class == 'potential_company' %}potential
-                {% elif lead.intent_class == 'emerging' %}emerging
-                {% else %}low{% endif %}
-              </span>
+              {% set intent_band = 'high' if lead.intent_class == 'high_intent' else 'medium' if lead.intent_class == 'emerging' else 'watch' if lead.intent_class == 'potential_company' else 'reject' %}
+              {{ lead.intent_class | status_badge('intent', 'band band-' ~ intent_band) }}
             </td>
             <td>{{ '%.0f'|format(lead.relevance_score) }}</td>
             <td>{{ lead.source_name }}</td>

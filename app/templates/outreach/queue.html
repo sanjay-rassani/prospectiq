@@ -29,8 +29,8 @@
       <tr>
         <td>{{ task.opportunity.company.name }}</td>
         <td><a href="/outreach/{{ task.id }}">{{ task.opportunity.title }}</a></td>
-        <td>{{ task.channel }}</td>
-        <td>{{ task.status }}</td>
+        <td>{{ task.channel | status_badge('channel') }}</td>
+        <td>{{ task.status | status_badge('outreach') }}</td>
         <td>{{ task.due_at or "—" }}</td>
       </tr>
       {% endfor %}

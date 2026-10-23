@@ -4,6 +4,102 @@
 :root {
   --pico-font-size: 95%;
   --pico-form-element-spacing-vertical: 0.5rem;
+  --site-brand: #1a4d6d;
+  --site-brand-muted: #5a7a8c;
+}
+
+/* Top chrome: brand left (home), primary nav centered with hover help. */
+.site-header {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) auto minmax(10rem, 1fr);
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  justify-self: start;
+  text-decoration: none;
+  color: var(--site-brand);
+  min-width: 0;
+}
+.site-brand:hover,
+.site-brand:focus {
+  text-decoration: none;
+  color: color-mix(in srgb, var(--site-brand) 80%, #000);
+}
+.site-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--site-brand);
+}
+.site-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+.site-brand-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+.site-brand-sub {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--site-brand-muted);
+  letter-spacing: 0.02em;
+}
+.site-nav {
+  justify-self: center;
+}
+.site-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.15rem 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.site-nav li { margin: 0; }
+.site-nav a {
+  display: inline-block;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.3rem;
+  text-decoration: none;
+  color: var(--pico-muted-color);
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+.site-nav a:hover,
+.site-nav a:focus {
+  color: var(--pico-color);
+  background: color-mix(in srgb, var(--pico-primary, #1095c1) 10%, transparent);
+  text-decoration: none;
+}
+.site-nav a[aria-current="page"] {
+  color: var(--pico-color);
+  background: color-mix(in srgb, var(--pico-primary, #1095c1) 14%, transparent);
+  font-weight: 600;
+}
+.site-header-spacer { justify-self: end; }
+
+@media (max-width: 720px) {
+  .site-header {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+  .site-brand { justify-self: start; }
+  .site-nav { justify-self: stretch; }
+  .site-nav ul { justify-content: flex-start; }
+  .site-header-spacer { display: none; }
+  .site-brand-sub { display: none; }
 }
 
 /* Priority bands from spec section 8.2. Scores are prioritisation aids, so the colour is
@@ -13,6 +109,18 @@
 .band-medium { background: #b8860b; color: #fff; }
 .band-watch  { background: #4a6fa5; color: #fff; }
 .band-reject { background: #6c757d; color: #fff; }
+
+/* Glossary terms: friendly label + hover title explains the underlying code. */
+.term {
+  cursor: help;
+  border-bottom: 1px dotted color-mix(in srgb, currentColor 45%, transparent);
+  text-decoration: none;
+}
+.band.term {
+  border-bottom: 0;
+  text-decoration: underline dotted rgba(255, 255, 255, 0.55);
+  text-underline-offset: 0.15em;
+}
 
 /* Evidence labelling (spec section 6.2): observed fact, inference, and hypothesis must be
    visually distinguishable so a guess is never mistaken for a finding. */
@@ -237,6 +345,115 @@ mark {
   display: inline-block;
   padding: 0.35rem 0.6rem;
   margin-bottom: 1rem;
+}
+
+.section-help {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  color: var(--pico-muted-color);
+  max-width: 42rem;
+}
+.opp-hero .tip { margin-top: 0.75rem; }
+.score-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+@media (max-width: 700px) {
+  .score-pair { grid-template-columns: 1fr; }
+}
+.score-pair h3 { margin-bottom: 0.25rem; font-size: 1rem; }
+.opp-story { margin: 1.25rem 0; }
+.step-need {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #b8860b;
+  font-weight: 700;
+}
+.buyer-role-card {
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+  border-left: 3px solid var(--pico-primary, #1095c1);
+  background: color-mix(in srgb, var(--pico-primary, #1095c1) 8%, transparent);
+}
+.find-layers { margin: 1rem 0 1.5rem; }
+.find-layer {
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.find-layer:last-child { border-bottom: 0; }
+.find-layer-head {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+.find-layer-num {
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  background: var(--pico-primary, #1095c1);
+  color: #fff;
+}
+.find-layer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.35rem 0 0.35rem 2.5rem;
+}
+.find-layer-actions form { margin: 0; }
+.find-layer-actions button,
+.find-layer-actions a[role="button"] {
+  width: auto;
+  margin: 0;
+}
+.find-page-list {
+  margin: 0.25rem 0 0 2.5rem;
+  font-size: 0.85rem;
+}
+.find-paste-form { margin-left: 2.5rem; }
+.find-loading {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  padding: 0.85rem 1rem;
+  margin: 0 0 1rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--pico-primary, #1095c1) 6%, transparent);
+}
+.find-spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.2rem;
+  border: 2px solid var(--pico-muted-border-color);
+  border-top-color: var(--pico-primary, #1095c1);
+  border-radius: 50%;
+  animation: find-spin 0.8s linear infinite;
+}
+@keyframes find-spin {
+  to { transform: rotate(360deg); }
+}
+button.linkish {
+  display: inline;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pico-primary, #1095c1);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
 }
 
 dl {

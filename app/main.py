@@ -33,6 +33,7 @@ from app.db.session import get_session
 from app.jobs.scheduler import start_scheduler, stop_scheduler
 from app.services.monitoring.today import load_today
 from app.services.sanitize import sanitize_for_display
+from app.ui.labels import priority_badge, status_badge, status_label
 
 settings = get_settings()
 
@@ -93,6 +94,9 @@ app.state.auth_secret = _auth_secret
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 templates.env.filters["sanitize"] = sanitize_for_display
+templates.env.filters["status_label"] = status_label
+templates.env.filters["status_badge"] = status_badge
+templates.env.filters["priority_badge"] = priority_badge
 app.state.templates = templates
 
 app.include_router(companies_router)

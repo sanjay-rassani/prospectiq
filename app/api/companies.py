@@ -533,6 +533,7 @@ def company_add_person(
     role: Annotated[str, Form()],
     public_email: Annotated[str, Form()] = "",
     public_profile_url: Annotated[str, Form()] = "",
+    return_to: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
     company = session.get(Company, company_id)
     if company is None:
@@ -547,8 +548,22 @@ def company_add_person(
             public_profile_url=public_profile_url or None,
         )
     except ValueError as exc:
+        dest = return_to.strip()
+        if dest.startswith("/opportunities/"):
+            sep = "&" if "?" in dest else "?"
+            return RedirectResponse(
+                url=f"{dest}{sep}flash={exc}",
+                status_code=303,
+            )
         return RedirectResponse(
             url=f"/companies/{company_id}?flash={exc}",
+            status_code=303,
+        )
+    dest = return_to.strip()
+    if dest.startswith("/opportunities/"):
+        sep = "&" if "?" in dest else "?"
+        return RedirectResponse(
+            url=f"{dest}{sep}step=2&flash=Added {person.name}",
             status_code=303,
         )
     return RedirectResponse(

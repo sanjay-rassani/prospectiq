@@ -4,6 +4,7 @@
 {% block content %}
 <header>
   <h1>Today</h1>
+  <p class="muted">Hover any status label (dotted underline) for a plain-language explanation.</p>
 </header>
 
 {% if flash %}
@@ -15,7 +16,7 @@
   {% if high_priority %}
   <table>
     <thead>
-      <tr><th>Company</th><th>Opportunity</th><th>Score</th><th>Status</th></tr>
+      <tr><th>Company</th><th>Opportunity</th><th>Score</th><th title="Hover a status for what it means">Status</th></tr>
     </thead>
     <tbody>
       {% for opp in high_priority %}
@@ -23,7 +24,7 @@
         <td><a href="/companies/{{ opp.company_id }}">{{ opp.company.name }}</a></td>
         <td><a href="/opportunities/{{ opp.id }}">{{ opp.title }}</a></td>
         <td>{% if opp.opportunity_score is not none %}{{ '%.0f'|format(opp.opportunity_score) }}{% else %}—{% endif %}</td>
-        <td>{{ opp.status }}</td>
+        <td>{{ opp.status | status_badge('opportunity') }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -42,7 +43,7 @@
     {% for task in due_outreach %}
     <li>
       <a href="/outreach/{{ task.id }}">{{ task.opportunity.company.name }} — {{ task.opportunity.title }}</a>
-      · {{ task.status }}
+      · {{ task.status | status_badge('outreach') }}
       {% if task.due_at %} · due {{ task.due_at }}{% endif %}
     </li>
     {% endfor %}
@@ -75,7 +76,7 @@
     <li>
       <a href="/companies/{{ company.id }}">{{ company.name }}</a>
       · resurfaced {{ company.resurfaced_at }}
-      · {{ company.priority or "—" }}
+      · {% if company.priority %}{{ company.priority | priority_badge }}{% else %}—{% endif %}
     </li>
     {% endfor %}
   </ul>

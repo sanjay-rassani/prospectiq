@@ -34,11 +34,11 @@
     <tr>
       <td><a href="/companies/{{ company.id }}">{{ company.name }}</a></td>
       <td><code>{{ company.domain }}</code></td>
-      <td>{{ company.status }}</td>
+      <td>{{ company.status | status_badge('company') }}</td>
       <td>
         {% if company.icp_score is not none %}
         {{ '%.0f'|format(company.icp_score) }}
-        {% if company.priority %} <span class="band band-{{ company.priority }}">{{ company.priority }}</span>{% endif %}
+        {% if company.priority %} {{ company.priority | priority_badge }}{% endif %}
         {% else %}—{% endif %}
       </td>
       <td>{{ snapshot_counts.get(company.id, 0) }}</td>

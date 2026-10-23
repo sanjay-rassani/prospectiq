@@ -11,17 +11,53 @@
   <script src="{{ url_for('static', path='/htmx.min.js') }}" defer></script>
 </head>
 <body>
-  <header class="container">
-    <nav>
-      <ul><li><strong>Prospecting Engine</strong></li></ul>
+  <header class="container site-header">
+    <a class="site-brand" href="/" title="Go to Today — your daily home desk">
+      <span class="site-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="28" height="28" focusable="false">
+          <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="2.5" fill="currentColor"/>
+          <path d="M16 2v4M16 26v4M2 16h4M26 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="site-brand-text">
+        <span class="site-brand-name">ProspectIQ</span>
+        <span class="site-brand-sub">Prospecting Engine</span>
+      </span>
+    </a>
+
+    <nav class="site-nav" aria-label="Main">
       <ul>
-        <li><a href="/" {% if active == 'today' %}aria-current="page"{% endif %}>Today</a></li>
-        <li><a href="/companies" {% if active == 'companies' %}aria-current="page"{% endif %}>Companies</a></li>
-        <li><a href="/contacts" {% if active == 'contacts' %}aria-current="page"{% endif %}>Contacts</a></li>
-        <li><a href="/outreach" {% if active == 'outreach' %}aria-current="page"{% endif %}>Outreach</a></li>
-        <li><a href="/settings" {% if active == 'settings' %}aria-current="page"{% endif %}>Settings</a></li>
+        <li>
+          <a href="/"
+             title="Today — what needs attention now: priority deals, drafts, and follow-ups"
+             {% if active == 'today' %}aria-current="page"{% endif %}>Today</a>
+        </li>
+        <li>
+          <a href="/companies"
+             title="Companies — discover leads, seed domains, research prospects and opportunities"
+             {% if active == 'companies' %}aria-current="page"{% endif %}>Companies</a>
+        </li>
+        <li>
+          <a href="/contacts"
+             title="Contacts — people found on company sites or added manually (never guessed emails)"
+             {% if active == 'contacts' %}aria-current="page"{% endif %}>Contacts</a>
+        </li>
+        <li>
+          <a href="/outreach"
+             title="Outreach — review drafts and follow-ups; you send messages yourself"
+             {% if active == 'outreach' %}aria-current="page"{% endif %}>Outreach</a>
+        </li>
+        <li>
+          <a href="/settings"
+             title="Settings — who you sell to, feeds, thresholds, and data exports"
+             {% if active == 'settings' %}aria-current="page"{% endif %}>Settings</a>
+        </li>
       </ul>
     </nav>
+
+    <div class="site-header-spacer" aria-hidden="true"></div>
   </header>
 
   <main class="container">

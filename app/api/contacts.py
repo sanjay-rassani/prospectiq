@@ -234,6 +234,7 @@ def company_discover_contacts(
     session: SessionDep,
     company_id: UUID,
     refresh: Annotated[str, Form()] = "",
+    return_to: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
     company = session.get(Company, company_id)
     if company is None:
@@ -245,6 +246,13 @@ def company_discover_contacts(
         payload={"refresh": refresh == "1"},
         dedupe_pending=True,
     )
+    dest = return_to.strip()
+    if dest.startswith("/opportunities/"):
+        sep = "&" if "?" in dest else "?"
+        return RedirectResponse(
+            url=f"{dest}{sep}finding=1&flash=Scanning company website for contacts…",
+            status_code=303,
+        )
     return RedirectResponse(
         url=f"/companies/{company_id}?flash=Contact discovery queued",
         status_code=303,

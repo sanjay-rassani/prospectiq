@@ -10,16 +10,16 @@ The app is **server-rendered** (FastAPI + Jinja + Pico.css). There is no React/A
 
 | Element | Location | What it does |
 | --- | --- | --- |
-| **Prospecting Engine** | Top-left brand | Visual only (not a link) |
-| **Today** | Top nav | Daily desk — `/` |
-| **Companies** | Top nav | Company list — `/companies` |
-| **Contacts** | Top nav | People directory — `/contacts` |
-| **Outreach** | Top nav | Draft / follow-up queue — `/outreach` |
-| **Settings** | Top nav | Profile, feeds, exports — `/settings` |
+| **ProspectIQ** logo + wordmark | Top-left | Click → home (`/`). Hover: “Go to Today…” |
+| **Today** | Top-center nav | Daily desk — hover explains priority deals / drafts / follow-ups |
+| **Companies** | Top-center nav | Discover, seed, research — hover explains |
+| **Contacts** | Top-center nav | People directory — hover explains |
+| **Outreach** | Top-center nav | Drafts & follow-ups — hover explains (you send) |
+| **Settings** | Top-center nav | Profile, feeds, exports — hover explains |
 | Footer note | Bottom | Reminder that sending is manual |
 | Yellow **flash** | Under page title | One-shot success/error message from last action |
 
-`aria-current="page"` highlights the active nav item.
+`aria-current="page"` highlights the active nav item. Hover any nav link for a new-user tip (`title=`).
 
 ---
 
@@ -245,22 +245,49 @@ Breadcrumb: Companies → name.
 
 Breadcrumb: Companies → company → title.
 
-| Section | Controls |
-| --- | --- |
-| Company ICP Fit | Read-only company score |
-| Opportunity Score | Deal timing score + dimensions; blockers list |
-| **Override** | Force `outreach_ready` with required reason |
-| Problem / Hypothesis / Why now / Outcome | Read-only narrative |
-| Buyer role | Recommended role + rationale |
-| Recommended contacts table | Links to contacts; relevance vs buyer role |
-| Manual research tasks | **Mark done** when you finished manual LinkedIn/research |
-| **Prepare outreach brief** | Pick contact + channel (LinkedIn/email) → creates outreach task |
-| Existing outreach tasks | Links to drafts |
-| **Record interaction** | Log sent/reply/outcome + optional next action datetime |
-| **Lifecycle** | Move status: watch, nurture, rejected, closed, conversation, project_lead |
-| Check stale | Apply stale-evidence stop rule |
+**Corrected product prompt (what we built):**  
+Redesign Opportunity detail for non-experts as a **stepper** (Understand → Find contact → Outreach → Follow up → Manage). Every step has a plain-language “what this is” help line. Contact finding uses layered actions: (A) scan public company website pages with loading/status UI; (B–C) open Google/LinkedIn search links in the operator’s browser (they use their own accounts — the app never logs in or scrapes LinkedIn/Google); (D) paste a contact found manually. Outreach never auto-sends.
 
-Email channel requires the selected contact to have a public email. **Nothing is sent by the app.**
+**What this page is:** a 5-step workspace for one deal idea. Top tip explains that nothing is sent automatically.
+
+### Stepper (always visible)
+
+| Step | Purpose (plain language) |
+| --- | --- |
+| **1 Understand** | Why this company, what we could offer, company-fit vs deal-timing scores, evidence |
+| **2 Find contact** | Find the buyer person via website scan / Google / LinkedIn (your browser) / paste |
+| **3 Outreach** | Prepare brief + draft — you send outside the app |
+| **4 Follow up** | Log sends/replies and next actions |
+| **5 Manage** | Lifecycle status + stale-evidence check |
+
+Query `?step=1…5` selects the panel. Default step is inferred (missing contact → 2, drafts → 3, interactions → 4).
+
+### Step 2 — Find contact layers
+
+| Layer | Control | What it does |
+| --- | --- | --- |
+| **A** | **Find contacts on website** | Queues scan of about/team/contact pages; shows loading spinner; polls `/opportunities/{id}/discover-contacts/status` until done |
+| **A** | **Refresh scan** | Same with refresh=1 |
+| **B** | **Open Google search** | New tab: role + company (+ site:domain) — you research manually |
+| **B** | **Google → LinkedIn profiles** | New tab: `site:linkedin.com/in` search |
+| **C** | **Open LinkedIn search** | New tab: LinkedIn people search (you use your own login) |
+| **C** | **Open company site** / people page links | Manual browse |
+| **D** | **Save contact** form | Paste name/role/email/profile found yourself |
+
+The app **never** logs into LinkedIn/Google and **never** scrapes them. Loading UI is only for Layer A (website scan job).
+
+### Other opportunity controls
+
+| Control | What it does |
+| --- | --- |
+| Score tables / story | Read-only narrative + optional “Why this deal score?” |
+| **Override** (advanced) | Force `outreach_ready` with required reason |
+| **Prepare outreach brief** | Pick contact + channel → creates outreach task |
+| **Record interaction** | Log channel/direction/outcome + next action |
+| **Move status** | watch, nurture, conversation, project_lead, rejected, closed |
+| **Check stale evidence** | Apply stale-evidence stop rule |
+
+Email channel requires a public email on the contact. **Nothing is sent by the app.**
 
 ---
 
@@ -365,6 +392,8 @@ Only relevant if the app is bound beyond `127.0.0.1` and `AUTH_TOKEN` is set. Ot
 
 ## 15. Glossary (UI terms)
 
+Statuses and bands show **friendly labels** (e.g. `outreach_ready` → **Ready to approach**). Hover any dotted-underline label for the full explanation. Source of truth: `app/ui/labels.py`.
+
 | Term | Meaning |
 | --- | --- |
 | **Lead** | Discovery candidate (project or org listing). Not yet a full company research record |
@@ -372,6 +401,8 @@ Only relevant if the app is bound beyond `127.0.0.1` and `AUTH_TOKEN` is set. Ot
 | **Snapshot** | Stored text of a fetched page + content hash |
 | **Signal** | Observed change/cue with verbatim excerpt |
 | **Opportunity** | Project *hypothesis* tied to signals |
+| **Ready to approach** (`outreach_ready`) | Worth preparing a message — you still send it yourself |
+| **Draft ready for you** (`draft_ready`) | Outreach draft waiting for your edit/approve |
 | **ICP Fit** | “Is this our kind of customer?” (no timing) |
 | **Opportunity Score** | “Is this idea worth acting on now?” |
 | **Intent class** | Buying-intent label on a Discover lead |
