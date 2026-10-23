@@ -37,6 +37,8 @@ def handle_job(session: Session, job: Job) -> str:
         return _handle_check_stale(session, job)
     if job.job_type == JobType.POLL_FEEDS.value:
         return _handle_poll_feeds(session, job)
+    if job.job_type == JobType.DISCOVER_CONTACTS.value:
+        return _handle_discover_contacts(session, job)
     raise ValueError(f"Unknown job type: {job.job_type}")
 
 
@@ -171,6 +173,24 @@ def _handle_poll_feeds(session: Session, job: Job) -> str:
         f"feeds={stats['feeds']} new={stats['new_entries']} "
         f"seeded={stats['seeded']} errors={stats['errors']}"
     )
+
+
+def _handle_discover_contacts(session: Session, job: Job) -> str:
+    from app.services.contacts.discover import discover_contacts_for_company
+
+    if job.entity_id is None:
+        raise ValueError("discover_contacts requires entity_id (company id)")
+    payload = job.payload_json or {}
+    result = discover_contacts_for_company(
+        session,
+        job.entity_id,
+        max_urls=int(payload.get("max_urls") or 12),
+        refresh=bool(payload.get("refresh")),
+    )
+    if result.errors and result.people_created == 0 and result.people_enriched == 0:
+        # Partial failure with no progress — surface for retry.
+        raise RuntimeError("; ".join(result.errors[:3]))
+    return result.message
 
 
 def ensure_maintenance_jobs(session: Session) -> None:

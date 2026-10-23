@@ -342,6 +342,7 @@ def company_detail(
             selectinload(Company.signals),
             selectinload(Company.opportunities),
             selectinload(Company.people),
+            selectinload(Company.contact_channels),
             selectinload(Company.research_tasks),
         )
     )
@@ -421,6 +422,6 @@ def company_add_person(
             status_code=303,
         )
     return RedirectResponse(
-        url=f"/companies/{company_id}?flash=Added {person.name}",
+        url=f"/contacts/{person.id}?flash=Added {person.name}",
         status_code=303,
     )

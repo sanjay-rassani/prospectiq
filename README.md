@@ -95,21 +95,43 @@ changed, recent snapshots. Link to **Failed jobs** if something broke.
   **Run discovery** (live SSE log, not stored). Same pipeline as Seed after a link matches.
   No paid search APIs; no Google scrape; no LinkedIn/Google password automation.
 - **List** — all companies and status.
-- **Detail** — ICP Fit + reasons, extracted facts, signals, opportunities, people,
+- **Detail** — ICP Fit + reasons, extracted facts, signals, opportunities, **contacts**,
   snapshot history, good/bad feedback, **Refresh now**, delete.
+  Use **Discover contacts** to fetch about/team/leadership/contact pages (robots-respecting),
+  extract named people and public emails, and store generic inboxes separately as company channels.
 
 Open an **opportunity** from here for scores, evidence, buyer role, and outreach.
 Short tips appear on Today, Companies, Seed, Discover, Outreach, and Settings.
+
+### Contacts (`/contacts`)
+
+Searchable directory of people discovered from permitted company pages or added manually.
+Filter by company, email/profile availability, seniority, and discovery status.
+Open a contact for field-level provenance, quality score, verification controls, and
+relevant opportunities. Email labels mean evidence strength (`source_confirmed`,
+`manually_verified`) — never inbox deliverability.
+
+**Sources (implemented):** company about/team/leadership/contact pages from the company
+domain (and existing snapshots of those paths). Explicit emails/phones/profile URLs on
+those pages. Manual operator entry. Generic `info@` / `sales@` go to company channels,
+not people.
+
+**Not implemented (by design):** LinkedIn scraping, mailbox guessing, SMTP probing,
+paid enrichment APIs, CAPTCHA bypass. If a buyer role has no matching person, a **research
+task** asks you to find and paste a public profile or email.
+
 ### Opportunity detail (`/opportunities/…`)
 
 One deal idea: problem, hypothesis, why-now, confidence, evidence quotes, Opportunity
-Score (separate from ICP), buyer role / people, promote to outreach-ready, prepare draft,
-record interactions (sent / reply / next action), lifecycle (watch / nurture / etc.).
+Score (separate from ICP), buyer role / **ranked contacts**, promote to outreach-ready,
+select a contact + channel, prepare draft, record interactions (sent / reply / next action),
+lifecycle (watch / nurture / etc.).
 
 ### Outreach (`/outreach`)
 
 Queue of drafts and due follow-ups. Open a task → edit draft → **approve** or reject →
 mark sent yourself → come back when they reply. The app never emails for you.
+Briefs prefills public email / profile URL only when evidence-backed on the selected contact.
 
 ### Settings (`/settings`)
 
@@ -138,9 +160,16 @@ underlying issue (Ollama down, bad URL, …).
 | Find prospects from feeds | Companies → Discover |
 | Remove a prospect | Companies → Delete (cascades all related data) |
 | Judge fit / evidence | Company or opportunity detail |
-| Send / follow up | Outreach |
+| Find / enrich people | Company → Discover contacts, or Contacts |
+| Send / follow up | Outreach (pick contact + channel) |
 | Tune who you target | Settings |
 | Fix broken background work | Failed jobs |
+
+After pulling this feature, run migrations:
+
+```bash
+.venv/bin/alembic upgrade head
+```
 
 ```bash
 .venv/bin/pytest
@@ -182,6 +211,8 @@ Exports: `/export/companies.json`, `/export/opportunities.csv`, `/export/interac
 
 Bound to `127.0.0.1` with no login by default. If you bind beyond localhost, set
 `AUTH_TOKEN` in `.env`. Secrets stay in `.env` only — run `./scripts/audit_secrets.sh`
-after changes. No LinkedIn scraping; no email guessing.
+after changes. No LinkedIn scraping; no email guessing. Contact discovery refuses loopback/private
+fetch targets (SSRF guard), respects robots.txt, and never labels format-valid emails as
+verified.
 
 Acceptance: [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md).

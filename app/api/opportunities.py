@@ -21,6 +21,7 @@ from app.models import (
     ResearchTaskStatus,
 )
 from app.services.buyers.research_tasks import find_person_for_role
+from app.services.contacts.relevance import rank_contacts_for_opportunity
 from app.services.scoring.promotion import override_outreach_ready
 
 router = APIRouter()
@@ -60,6 +61,9 @@ def opportunity_detail(
     if opportunity.buyer_role:
         match = find_person_for_role(list(opportunity.company.people), opportunity.buyer_role)
         matching_people = [match] if match else []
+    ranked_contacts = rank_contacts_for_opportunity(
+        session, opportunity, company=opportunity.company, limit=15
+    )
     open_tasks = [
         t for t in opportunity.research_tasks if t.status == ResearchTaskStatus.OPEN.value
     ]
@@ -70,6 +74,7 @@ def opportunity_detail(
             "title": opportunity.title,
             "opportunity": opportunity,
             "matching_people": matching_people,
+            "ranked_contacts": ranked_contacts,
             "open_research_tasks": open_tasks,
             "outreach_tasks": opportunity.outreach_tasks,
             "interaction_outcomes": [o.value for o in InteractionOutcome],

@@ -40,8 +40,12 @@ def find_person_for_role(people: list[Person], role: str) -> Person | None:
     return None
 
 
-def research_task_title(role: str) -> str:
-    return f"Find {role} on LinkedIn"
+def research_task_title(role: str, company_name: str | None = None) -> str:
+    who = f" at {company_name}" if company_name else ""
+    return (
+        f"Find the {role}{who} and record their publicly available "
+        "professional profile or business email"
+    )
 
 
 def ensure_research_task(
@@ -76,7 +80,7 @@ def ensure_research_task(
         session.flush()
         return None, False
 
-    title = research_task_title(role)
+    title = research_task_title(role, company.name)
     existing = session.scalar(
         select(ResearchTask).where(
             ResearchTask.opportunity_id == opportunity.id,

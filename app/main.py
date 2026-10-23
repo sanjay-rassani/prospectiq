@@ -21,6 +21,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.companies import router as companies_router
+from app.api.contacts import router as contacts_router
 from app.api.export import router as export_router
 from app.api.jobs import router as jobs_router
 from app.api.opportunities import router as opportunities_router
@@ -95,6 +96,7 @@ templates.env.filters["sanitize"] = sanitize_for_display
 app.state.templates = templates
 
 app.include_router(companies_router)
+app.include_router(contacts_router)
 app.include_router(opportunities_router)
 app.include_router(outreach_router)
 app.include_router(jobs_router)
