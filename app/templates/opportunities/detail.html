@@ -111,12 +111,40 @@
   {% if opportunity.buyer_role_rationale %}
   <p><small>{{ opportunity.buyer_role_rationale }}</small></p>
   {% endif %}
-  {% if matching_people %}
+  {% if ranked_contacts %}
+  <p><strong>Recommended contacts</strong></p>
+  <p><small>Scores reflect title alignment with recommended buyer roles — not verified decision-maker status.</small></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Contact</th>
+        <th>Observed title</th>
+        <th>Relevance</th>
+        <th>Contact info</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in ranked_contacts %}
+      <tr>
+        <td><a href="/contacts/{{ item.person.id }}">{{ item.person.name }}</a></td>
+        <td>{{ item.person.role }}</td>
+        <td>{{ item.relevance_score }}{% if item.matched_roles %}<br><small>{{ item.matched_roles | join(', ') }}</small>{% endif %}</td>
+        <td>
+          {% if item.person.public_email %}{{ item.person.public_email }}{% else %}no email{% endif %}
+          {% if item.person.public_profile_url %}
+          · <a href="{{ item.person.public_profile_url }}" target="_blank" rel="noopener">profile</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% elif matching_people %}
   <p><strong>Matching people</strong></p>
   <ul>
     {% for person in matching_people %}
     <li>
-      {{ person.name }} — {{ person.role }}
+      <a href="/contacts/{{ person.id }}">{{ person.name }}</a> — {{ person.role }}
       {% if person.public_email %} · {{ person.public_email }}{% endif %}
       {% if person.public_profile_url %}
       · <a href="{{ person.public_profile_url }}" target="_blank" rel="noopener">profile</a>
@@ -146,6 +174,19 @@
   {% if opportunity.status in ['outreach_ready', 'active'] %}
   <form method="post" action="/opportunities/{{ opportunity.id }}/outreach">
     <label>
+      Contact
+      <select name="person_id">
+        <option value="">Auto-match buyer role (if possible)</option>
+        {% for item in ranked_contacts %}
+        <option value="{{ item.person.id }}">
+          {{ item.person.name }} — {{ item.person.role }}
+          {% if item.person.public_email %} · email{% endif %}
+          {% if item.person.public_profile_url %} · profile{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
       Channel
       <select name="channel">
         <option value="linkedin">LinkedIn</option>
@@ -154,6 +195,7 @@
     </label>
     <button type="submit">Prepare outreach brief</button>
   </form>
+  <p><small>Email channel requires a public email on the selected contact. Nothing is sent automatically.</small></p>
   {% endif %}
   {% if outreach_tasks %}
   <ul>

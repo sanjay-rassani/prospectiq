@@ -14,7 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from app.models.person import Person, ResearchTask
+    from app.models.person import CompanyContactChannel, Person, ResearchTask
     from app.models.signal import Opportunity, Signal
 
 
@@ -107,6 +107,10 @@ class Company(Base, TimestampMixin):
         back_populates="company",
         cascade="all, delete-orphan",
         order_by="asc(Person.name)",
+    )
+    contact_channels: Mapped[list[CompanyContactChannel]] = relationship(
+        cascade="all, delete-orphan",
+        order_by="asc(CompanyContactChannel.value)",
     )
     research_tasks: Mapped[list[ResearchTask]] = relationship(
         back_populates="company",

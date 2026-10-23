@@ -35,6 +35,10 @@ def assemble_brief(
         f"{person.name} ({person.role})" if person is not None else f"role: {role}"
     )
 
+    contact_email = person.public_email if person is not None else None
+    contact_profile = person.public_profile_url if person is not None else None
+    email_status = person.email_status if person is not None else None
+
     return {
         "company": {
             "name": company.name,
@@ -45,6 +49,9 @@ def assemble_brief(
         "person_or_role": person_label,
         "buyer_role": role,
         "person_id": str(person.id) if person is not None else None,
+        "public_email": contact_email,
+        "email_status": email_status,
+        "public_profile_url": contact_profile,
         "observed_trigger": opportunity.why_now,
         "project_hypothesis": opportunity.hypothesis,
         "problem_or_change": opportunity.problem_or_change,
@@ -73,24 +80,35 @@ def brief_as_markdown(brief: dict[str, Any]) -> str:
         f"- Channel: {brief.get('suggested_channel')}",
         f"- Solution family: {brief.get('solution_family')}",
         f"- Confidence: {brief.get('confidence')}",
-        "",
-        "## Observed trigger / why now",
-        str(brief.get("why_now") or ""),
-        "",
-        "## Problem or change",
-        str(brief.get("problem_or_change") or ""),
-        "",
-        "## Project hypothesis",
-        str(brief.get("project_hypothesis") or ""),
-        "",
-        "## Business outcome",
-        str(brief.get("business_outcome") or ""),
-        "",
-        "## Desired conversation goal",
-        str(brief.get("desired_conversation_goal") or ""),
-        "",
-        "## Evidence",
     ]
+    if brief.get("public_email"):
+        lines.append(
+            f"- Public email: {brief.get('public_email')} "
+            f"(status: {brief.get('email_status') or 'unknown'} — not deliverability)"
+        )
+    if brief.get("public_profile_url"):
+        lines.append(f"- Profile URL: {brief.get('public_profile_url')}")
+    lines.extend(
+        [
+            "",
+            "## Observed trigger / why now",
+            str(brief.get("why_now") or ""),
+            "",
+            "## Problem or change",
+            str(brief.get("problem_or_change") or ""),
+            "",
+            "## Project hypothesis",
+            str(brief.get("project_hypothesis") or ""),
+            "",
+            "## Business outcome",
+            str(brief.get("business_outcome") or ""),
+            "",
+            "## Desired conversation goal",
+            str(brief.get("desired_conversation_goal") or ""),
+            "",
+            "## Evidence",
+        ]
+    )
     for item in brief.get("evidence") or []:
         lines.append(
             f"- [{item.get('type')}/{item.get('strength')}] {item.get('summary')}"

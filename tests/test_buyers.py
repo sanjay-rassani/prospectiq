@@ -251,7 +251,7 @@ def test_research_task_opened_without_person_and_closed_when_added(
     task, created = ensure_research_task(session, company, opp, people=[])
     assert created
     assert task is not None
-    assert task.title == research_task_title(opp.buyer_role)
+    assert task.title == research_task_title(opp.buyer_role, company.name)
     assert task.status == ResearchTaskStatus.OPEN.value
 
     person = add_manual_person(

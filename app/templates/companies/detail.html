@@ -215,25 +215,50 @@
 </article>
 
 <article>
-  <header><strong>People</strong></header>
-  {% if company.people %}
+  <header class="row">
+    <div>
+      <strong>Contacts</strong>
+      {% set active_people = company.people | rejectattr('archived_at') | list %}
+      <span>· {{ active_people | length }} discovered</span>
+      {% set with_email = active_people | selectattr('public_email') | list %}
+      <span>· {{ with_email | length }} with email</span>
+      {% set with_profile = active_people | selectattr('public_profile_url') | list %}
+      <span>· {{ with_profile | length }} with profile</span>
+    </div>
+    <div class="actions">
+      <form method="post" action="/companies/{{ company.id }}/discover-contacts">
+        <button type="submit">Discover contacts</button>
+      </form>
+      <form method="post" action="/companies/{{ company.id }}/discover-contacts">
+        <input type="hidden" name="refresh" value="1">
+        <button type="submit" class="outline">Refresh contacts</button>
+      </form>
+      <a href="/contacts?company_id={{ company.id }}">All contacts</a>
+    </div>
+  </header>
+  {% if active_people %}
   <table>
     <thead>
       <tr>
         <th>Name</th>
         <th>Role</th>
         <th>Email</th>
-        <th>Source</th>
+        <th>Status</th>
+        <th>Quality</th>
         <th>Profile</th>
       </tr>
     </thead>
     <tbody>
-      {% for person in company.people %}
+      {% for person in active_people %}
       <tr>
-        <td>{{ person.name }}</td>
-        <td>{{ person.role }}</td>
-        <td>{{ person.public_email or "—" }}</td>
-        <td>{{ person.source }}</td>
+        <td><a href="/contacts/{{ person.id }}">{{ person.name }}</a></td>
+        <td>{{ person.role }}{% if person.department %} <small>({{ person.department }})</small>{% endif %}</td>
+        <td>
+          {{ person.public_email or "—" }}
+          {% if person.public_email %}<br><small>{{ person.email_status }}</small>{% endif %}
+        </td>
+        <td>{{ person.discovery_status }}</td>
+        <td>{% if person.quality_score is not none %}{{ '%.0f'|format(person.quality_score) }}{% else %}—{% endif %}</td>
         <td>
           {% if person.public_profile_url %}
           <a href="{{ person.public_profile_url }}" target="_blank" rel="noopener">link</a>
@@ -246,7 +271,16 @@
     </tbody>
   </table>
   {% else %}
-  <p>No people yet. Captured only from about/team/contact pages, or added manually below.</p>
+  <p>No contacts yet. Run discovery on about/team/contact pages, or add manually below.</p>
+  {% endif %}
+
+  {% if company.contact_channels %}
+  <p><strong>Company channels</strong> <small>(generic inboxes — not people)</small></p>
+  <ul>
+    {% for ch in company.contact_channels %}
+    <li>{{ ch.channel_type }}: {{ ch.value }}{% if ch.label %} ({{ ch.label }}){% endif %}</li>
+    {% endfor %}
+  </ul>
   {% endif %}
 
   {% set open_research = company.research_tasks | selectattr('status', 'equalto', 'open') | list %}
@@ -264,15 +298,15 @@
 
   <form method="post" action="/companies/{{ company.id }}/people">
     <fieldset>
-      <legend>Add person (manual research)</legend>
+      <legend>Add contact (manual research)</legend>
       <label>Name <input type="text" name="name" required></label>
       <label>Role <input type="text" name="role" required placeholder="Head of Operations"></label>
       <label>Public email <input type="email" name="public_email" placeholder="optional — never guessed"></label>
-      <label>Public profile URL <input type="url" name="public_profile_url" placeholder="optional — paste LinkedIn URL after manual research"></label>
-      <button type="submit">Save person</button>
+      <label>Public profile URL <input type="url" name="public_profile_url" placeholder="optional — paste after manual research"></label>
+      <button type="submit">Save contact</button>
     </fieldset>
   </form>
-  <p><small>No LinkedIn scraping. No email pattern guessing. Paste only what you found yourself.</small></p>
+  <p><small>No LinkedIn scraping. No email pattern guessing. Format-valid ≠ verified. Paste only what you found yourself.</small></p>
 </article>
 
 <article>

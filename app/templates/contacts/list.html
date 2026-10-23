@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% set active = 'contacts' %}
+
+{% block content %}
+<header class="row">
+  <div>
+    <h1>Contacts</h1>
+    <p>{{ total }} contact{% if total != 1 %}s{% endif %} · public-source and manually entered only</p>
+  </div>
+</header>
+
+{% if flash %}
+<p><mark>{{ flash }}</mark></p>
+{% endif %}
+
+<form method="get" action="/contacts" class="filters">
+  <label>Search <input type="search" name="q" value="{{ q }}" placeholder="name, role, email, company"></label>
+  <label>
+    Company
+    <select name="company_id">
+      <option value="">All</option>
+      {% for c in companies %}
+      <option value="{{ c.id }}" {% if company_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    Email
+    <select name="has_email">
+      <option value="" {% if not has_email %}selected{% endif %}>Any</option>
+      <option value="1" {% if has_email == '1' %}selected{% endif %}>Has email</option>
+      <option value="0" {% if has_email == '0' %}selected{% endif %}>No email</option>
+    </select>
+  </label>
+  <label>
+    Profile
+    <select name="has_profile">
+      <option value="" {% if not has_profile %}selected{% endif %}>Any</option>
+      <option value="1" {% if has_profile == '1' %}selected{% endif %}>Has profile URL</option>
+      <option value="0" {% if has_profile == '0' %}selected{% endif %}>No profile</option>
+    </select>
+  </label>
+  <label>
+    Seniority
+    <select name="seniority">
+      <option value="">Any</option>
+      {% for s in ['c-level', 'founder', 'executive', 'vp', 'head', 'director', 'manager', 'lead'] %}
+      <option value="{{ s }}" {% if seniority == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    Status
+    <select name="status">
+      <option value="">Any</option>
+      {% for s in ['discovered', 'enriched', 'needs_research'] %}
+      <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Filter</button>
+</form>
+
+{% if people %}
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Company</th>
+      <th>Role</th>
+      <th>Email</th>
+      <th>Quality</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for person in people %}
+    <tr>
+      <td><a href="/contacts/{{ person.id }}">{{ person.name }}</a></td>
+      <td><a href="/companies/{{ person.company_id }}">{{ person.company.name }}</a></td>
+      <td>{{ person.role }}</td>
+      <td>
+        {{ person.public_email or "—" }}
+        {% if person.public_email %}<br><small>{{ person.email_status }}</small>{% endif %}
+      </td>
+      <td>{% if person.quality_score is not none %}{{ '%.0f'|format(person.quality_score) }}{% else %}—{% endif %}</td>
+      <td>{{ person.discovery_status }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if total > page_size %}
+<p>
+  {% if page > 1 %}
+  <a href="/contacts?q={{ q }}&company_id={{ company_id }}&has_email={{ has_email }}&has_profile={{ has_profile }}&seniority={{ seniority }}&status={{ status }}&page={{ page - 1 }}">Previous</a>
+  {% endif %}
+  Page {{ page }}
+  {% if page * page_size < total %}
+  · <a href="/contacts?q={{ q }}&company_id={{ company_id }}&has_email={{ has_email }}&has_profile={{ has_profile }}&seniority={{ seniority }}&status={{ status }}&page={{ page + 1 }}">Next</a>
+  {% endif %}
+</p>
+{% endif %}
+{% else %}
+<p>No contacts match. Discover contacts from a company page, or add one manually.</p>
+{% endif %}
+{% endblock %}
