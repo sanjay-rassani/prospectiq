@@ -5,10 +5,10 @@
 <header class="row">
   <div>
     <h1>Discover</h1>
-    <p>Describe who you want. ProspectIQ searches permitted public sources for matching leads.</p>
+    <p>Find leads. Save filters, run, review results.</p>
   </div>
   <div class="actions">
-    <a href="/companies/seed" role="button" class="secondary outline">Manual seed</a>
+    <a href="/companies/seed" role="button" class="secondary outline">Seed URL</a>
   </div>
 </header>
 
@@ -16,286 +16,221 @@
 <p><mark>{{ flash }}</mark></p>
 {% endif %}
 
-<p class="tip">
-  <strong>Automated discovery is the default.</strong> Targeting filters drive Hacker News,
-  UK Contracts Finder, optional SearXNG, and your RSS feeds.
-  Upwork/Fiverr/LinkedIn are listed but <em>not searched</em> (no permitted public API).
-  Manual seed remains for URLs you already have. No Google scrape. No paid APIs required.
-</p>
-
-<nav class="stepper" aria-label="Discover steps">
-  <ol class="stepper-list">
-    <li><button type="button" class="stepper-btn" data-goto="1" aria-current="step"><span class="step-num">1</span> Targeting</button></li>
-    <li><button type="button" class="stepper-btn" data-goto="2"><span class="step-num">2</span> Sources</button></li>
-    <li><button type="button" class="stepper-btn" data-goto="3"><span class="step-num">3</span> Feeds</button></li>
-    <li><button type="button" class="stepper-btn" data-goto="4"><span class="step-num">4</span> Run</button></li>
-    <li><button type="button" class="stepper-btn" data-goto="5"><span class="step-num">5</span> Results</button></li>
-  </ol>
-</nav>
-
-{# Steps 1–2 share one prefs form so hidden panels still submit. #}
-<form method="post" action="/companies/discover/prefs" id="discover-prefs-form">
-
-<section class="step-panel" data-step="1" id="step-1">
-  <article>
-    <header><strong>Step 1 — Targeting</strong></header>
-    <p class="tip">
-      Start here. Filters generate source queries and score results.
-      ICP Fit still uses your <a href="/settings">Settings</a> profile after a company is saved.
-    </p>
-    <label>Focus preset
-      <select name="focus_preset" id="focus-preset">
-        {% for key, label in preset_choices %}
-        <option value="{{ key }}" {% if discovery.focus_preset == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <p class="tip"><strong>Tip:</strong> A preset ticks keyword boxes. Lead types and services stay as you set them.</p>
-
-    <fieldset class="choice-fieldset">
-      <legend>Lead type</legend>
-      <div class="choice-grid">
-        {% for key, label in lead_types %}
-        <label class="choice-chip">
-          <input type="checkbox" name="lead_type" value="{{ key }}"
-            {% if key.casefold() in selected_lead_types %}checked{% endif %}>
-          {{ label }}
+<div class="discover-layout">
+  <aside class="discover-filters">
+    <form method="post" action="/companies/discover/prefs" id="discover-prefs-form">
+      <article>
+        <header><strong>Who</strong></header>
+        <label>Preset
+          <select name="focus_preset" id="focus-preset">
+            {% for key, label in preset_choices %}
+            <option value="{{ key }}" {% if discovery.focus_preset == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
         </label>
-        {% endfor %}
-      </div>
-    </fieldset>
 
-    <fieldset class="choice-fieldset">
-      <legend>Services you sell</legend>
-      <div class="choice-grid">
-        {% for key, label in services %}
-        <label class="choice-chip">
-          <input type="checkbox" name="service_choice" value="{{ key }}"
-            {% if key.casefold() in selected_services %}checked{% endif %}>
-          {{ label }}
+        <fieldset class="choice-fieldset compact">
+          <legend>Type</legend>
+          <div class="choice-grid">
+            {% for key, label in lead_types %}
+            <label class="choice-chip">
+              <input type="checkbox" name="lead_type" value="{{ key }}"
+                {% if key.casefold() in selected_lead_types %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <fieldset class="choice-fieldset compact">
+          <legend>Services</legend>
+          <div class="choice-grid">
+            {% for key, label in services %}
+            <label class="choice-chip">
+              <input type="checkbox" name="service_choice" value="{{ key }}"
+                {% if key.casefold() in selected_services %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <fieldset class="choice-fieldset compact">
+          <legend>Industries</legend>
+          <div class="choice-grid">
+            {% for key, label in industries %}
+            <label class="choice-chip">
+              <input type="checkbox" name="industry_choice" value="{{ key }}"
+                {% if key.casefold() in selected_industries %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </div>
+          <label>Match
+            <select name="industry_mode">
+              <option value="flexible" {% if discovery.industry_mode != 'strict' %}selected{% endif %}>Flexible</option>
+              <option value="strict" {% if discovery.industry_mode == 'strict' %}selected{% endif %}>Strict</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <label>Places
+          <input type="text" name="geographies" value="{{ discovery.geographies | join(', ') }}"
+            placeholder="UK, EU, remote">
         </label>
-        {% endfor %}
-      </div>
-    </fieldset>
-
-    <fieldset class="choice-fieldset">
-      <legend>Industries</legend>
-      <div class="choice-grid">
-        {% for key, label in industries %}
-        <label class="choice-chip">
-          <input type="checkbox" name="industry_choice" value="{{ key }}"
-            {% if key.casefold() in selected_industries %}checked{% endif %}>
-          {{ label }}
+        <label>Must include
+          <input type="text" name="required_keywords" value="{{ discovery.required_keywords | join(', ') }}"
+            placeholder="automation, CRM">
         </label>
-        {% endfor %}
-      </div>
-      <label>Industry matching
-        <select name="industry_mode">
-          <option value="flexible" {% if discovery.industry_mode != 'strict' %}selected{% endif %}>Flexible — boost matches, keep others</option>
-          <option value="strict" {% if discovery.industry_mode == 'strict' %}selected{% endif %}>Strict — drop listings without industry terms</option>
-        </select>
-      </label>
-    </fieldset>
-
-    <div class="grid">
-      <label>Geography (comma-separated countries / regions / cities)
-        <input type="text" name="geographies" value="{{ discovery.geographies | join(', ') }}"
-          placeholder="UK, EU, remote">
-      </label>
-      <label>Required keywords (must appear)
-        <input type="text" name="required_keywords" value="{{ discovery.required_keywords | join(', ') }}"
-          placeholder="e.g. automation, CRM">
-      </label>
-    </div>
-    <label>
-      <input type="checkbox" name="include_remote" value="on"
-        {% if discovery.include_remote %}checked{% endif %}>
-      Include remote / location-unknown opportunities
-    </label>
-    <div class="grid">
-      <label>Min public budget (optional)
-        <input type="number" name="budget_min" step="1" value="{{ discovery.budget_min or '' }}">
-      </label>
-      <label>Max public budget (optional)
-        <input type="number" name="budget_max" step="1" value="{{ discovery.budget_max or '' }}">
-      </label>
-      <label>Currency
-        <input type="text" name="budget_currency" value="{{ discovery.budget_currency or '' }}" placeholder="GBP">
-      </label>
-      <label>Minimum relevance (0–100)
-        <input type="number" name="min_relevance" min="0" max="100" value="{{ discovery.min_relevance }}">
-      </label>
-    </div>
-    <p class="tip">Budget filters only apply when a listing <em>publishes</em> a value. Missing budgets are not invented.</p>
-
-    <fieldset class="choice-fieldset">
-      <legend>Include topics <small>(match at least one if any selected)</small></legend>
-      {% for group_name, items in keyword_groups.items() %}
-      <p class="choice-group-label">{{ group_name }}</p>
-      <div class="choice-grid">
-        {% for item in items %}
-        <label class="choice-chip">
-          <input type="checkbox" name="keyword_choice" value="{{ item }}"
-            class="kw-choice"
-            {% if item.casefold() in selected_keywords %}checked{% endif %}>
-          {{ item }}
+        <label>
+          <input type="checkbox" name="include_remote" value="on"
+            {% if discovery.include_remote %}checked{% endif %}>
+          Allow remote / unknown location
         </label>
-        {% endfor %}
-      </div>
-      {% endfor %}
-      <label>Extra keywords (optional, comma-separated)
-        <input type="text" name="custom_keywords" id="custom-keywords"
-          value="{{ custom_keywords_value }}"
-          placeholder="e.g. cold chain, ERP, fleet">
-      </label>
-    </fieldset>
-
-    <fieldset class="choice-fieldset">
-      <legend>Exclude topics</legend>
-      {% for group_name, items in exclude_groups.items() %}
-      <p class="choice-group-label">{{ group_name }}</p>
-      <div class="choice-grid">
-        {% for item in items %}
-        <label class="choice-chip">
-          <input type="checkbox" name="exclude_choice" value="{{ item }}"
-            class="ex-choice"
-            {% if item.casefold() in selected_excludes %}checked{% endif %}>
-          {{ item }}
+        <label>Min score
+          <input type="number" name="min_relevance" min="0" max="100" value="{{ discovery.min_relevance }}">
         </label>
-        {% endfor %}
-      </div>
-      {% endfor %}
-      <label>Extra excludes (optional, comma-separated)
-        <input type="text" name="custom_excludes" id="custom-excludes"
-          value="{{ custom_excludes_value }}"
-          placeholder="e.g. internship, layoff">
-      </label>
-    </fieldset>
 
-    <label>
-      <input type="checkbox" name="use_profile_industries_as_keywords" value="on" id="use-industries"
-        {% if discovery.use_profile_industries_as_keywords %}checked{% endif %}>
-      Also match Settings target industries
-      {% if profile.target_industries %}
-      (<code>{{ profile.target_industries[:8] | join(', ') }}{% if profile.target_industries|length > 8 %}…{% endif %}</code>)
-      {% endif %}
-    </label>
-    <label>
-      <input type="checkbox" name="skip_social_hosts" value="on"
-        {% if discovery.skip_social_hosts %}checked{% endif %}>
-      Skip LinkedIn / Twitter / social links (recommended)
-    </label>
+        <details class="more-filters">
+          <summary>More filters</summary>
+          <div class="grid">
+            <label>Budget min
+              <input type="number" name="budget_min" step="1" value="{{ discovery.budget_min or '' }}">
+            </label>
+            <label>Budget max
+              <input type="number" name="budget_max" step="1" value="{{ discovery.budget_max or '' }}">
+            </label>
+            <label>Currency
+              <input type="text" name="budget_currency" value="{{ discovery.budget_currency or '' }}" placeholder="GBP">
+            </label>
+          </div>
 
-    <div class="stepper-nav">
-      <span></span>
-      <button type="button" class="outline" data-goto="2">Next: Sources →</button>
-    </div>
-  </article>
-</section>
+          <fieldset class="choice-fieldset compact">
+            <legend>Keywords</legend>
+            {% for group_name, items in keyword_groups.items() %}
+            <p class="choice-group-label">{{ group_name }}</p>
+            <div class="choice-grid">
+              {% for item in items %}
+              <label class="choice-chip">
+                <input type="checkbox" name="keyword_choice" value="{{ item }}"
+                  class="kw-choice"
+                  {% if item.casefold() in selected_keywords %}checked{% endif %}>
+                {{ item }}
+              </label>
+              {% endfor %}
+            </div>
+            {% endfor %}
+            <label>Extra
+              <input type="text" name="custom_keywords" id="custom-keywords"
+                value="{{ custom_keywords_value }}" placeholder="fleet, ERP">
+            </label>
+          </fieldset>
 
-<section class="step-panel" data-step="2" id="step-2" hidden>
-  <article>
-    <header><strong>Step 2 — Sources</strong></header>
-    <p class="tip">
-      Only <strong>available</strong> sources are searched. Restricted marketplaces stay visible so you know why they are off.
-    </p>
-    <table>
-      <thead>
-        <tr><th></th><th>Source</th><th>Status</th><th>Notes</th></tr>
-      </thead>
-      <tbody>
-        {% for cap in source_capabilities %}
-        <tr>
-          <td>
+          <fieldset class="choice-fieldset compact">
+            <legend>Exclude</legend>
+            {% for group_name, items in exclude_groups.items() %}
+            <p class="choice-group-label">{{ group_name }}</p>
+            <div class="choice-grid">
+              {% for item in items %}
+              <label class="choice-chip">
+                <input type="checkbox" name="exclude_choice" value="{{ item }}"
+                  class="ex-choice"
+                  {% if item.casefold() in selected_excludes %}checked{% endif %}>
+                {{ item }}
+              </label>
+              {% endfor %}
+            </div>
+            {% endfor %}
+            <label>Extra
+              <input type="text" name="custom_excludes" id="custom-excludes"
+                value="{{ custom_excludes_value }}" placeholder="internship">
+            </label>
+          </fieldset>
+
+          <label>
+            <input type="checkbox" name="use_profile_industries_as_keywords" value="on" id="use-industries"
+              {% if discovery.use_profile_industries_as_keywords %}checked{% endif %}>
+            Use Settings industries
+          </label>
+          <label>
+            <input type="checkbox" name="skip_social_hosts" value="on"
+              {% if discovery.skip_social_hosts %}checked{% endif %}>
+            Skip social links
+          </label>
+        </details>
+      </article>
+
+      <article>
+        <header><strong>Sources</strong></header>
+        <ul class="source-list">
+          {% for cap in source_capabilities %}
+          <li>
             {% if cap.availability != 'restricted' %}
-            <input type="checkbox" name="source_choice" value="{{ cap.key }}"
-              {% if cap.key.casefold() in selected_sources %}checked{% endif %}>
+            <label class="choice-chip">
+              <input type="checkbox" name="source_choice" value="{{ cap.key }}"
+                {% if cap.key.casefold() in selected_sources %}checked{% endif %}>
+              {{ cap.label }}
+            </label>
+            {% if cap.availability == 'optional_config' %}
+            <span class="band band-watch">setup</span>
+            {% else %}
+            <span class="band band-high">on</span>
             {% endif %}
-          </td>
-          <td>{{ cap.label }}<br><small>{{ cap.category }}</small></td>
-          <td>
-            {% if cap.availability == 'available' %}<span class="band band-high">available</span>
-            {% elif cap.availability == 'optional_config' %}<span class="band band-watch">needs config</span>
-            {% else %}<span class="band band-reject">restricted</span>{% endif %}
-          </td>
-          <td><small>{{ cap.limitations }}{% if cap.requires_config %} · {{ cap.requires_config }}{% endif %}</small></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <label>
-      <input type="checkbox" name="prefer_high_intent" value="on"
-        {% if discovery.prefer_high_intent %}checked{% endif %}>
-      Prefer explicit buying-intent listings over general company matches
-    </label>
-    <p class="tip">How hard each <em>Run discovery</em> pass works. Activity logs are live only — not saved to the database.</p>
-    <div class="grid">
-      <label>Max new entries per feed
-        <input type="number" name="max_new_entries_per_feed" min="1" max="200"
-          value="{{ discovery.max_new_entries_per_feed }}">
-      </label>
-      <label>Max companies to seed per run
-        <input type="number" name="max_seeds_per_poll" min="0" max="100"
-          value="{{ discovery.max_seeds_per_poll }}">
-      </label>
-    </div>
-    <label>
-      <input type="checkbox" name="seed_new_links" value="on"
-        {% if discovery.seed_new_links %}checked{% endif %}>
-      Seed matching links into Companies (same pipeline as manual seed)
-    </label>
-    <label>
-      <input type="checkbox" name="only_unknown_domains" value="on"
-        {% if discovery.only_unknown_domains %}checked{% endif %}>
-      Skip domains already in Companies
-    </label>
-    <button type="submit">Save filters &amp; behavior</button>
-    <div class="stepper-nav">
-      <button type="button" class="secondary outline" data-goto="1">← Targeting</button>
-      <button type="button" class="outline" data-goto="3">Next: Feeds →</button>
-    </div>
-  </article>
-</section>
+            {% else %}
+            <span class="muted">{{ cap.label }}</span>
+            <span class="band band-reject">off</span>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        <label>
+          <input type="checkbox" name="prefer_high_intent" value="on"
+            {% if discovery.prefer_high_intent %}checked{% endif %}>
+          Prefer buying intent
+        </label>
+        <div class="grid">
+          <label>Max / source
+            <input type="number" name="max_new_entries_per_feed" min="1" max="200"
+              value="{{ discovery.max_new_entries_per_feed }}">
+          </label>
+          <label>Max seed
+            <input type="number" name="max_seeds_per_poll" min="0" max="100"
+              value="{{ discovery.max_seeds_per_poll }}">
+          </label>
+        </div>
+        <label>
+          <input type="checkbox" name="seed_new_links" value="on"
+            {% if discovery.seed_new_links %}checked{% endif %}>
+          Auto-save company domains
+        </label>
+        <label>
+          <input type="checkbox" name="only_unknown_domains" value="on"
+            {% if discovery.only_unknown_domains %}checked{% endif %}>
+          Skip known domains
+        </label>
+        <button type="submit">Save filters</button>
+      </article>
+    </form>
 
-</form>
-
-<section class="step-panel" data-step="3" id="step-3" hidden>
-  <article>
-    <header><strong>Step 3 — Feeds (supplementary)</strong></header>
-    <p class="tip">
-      RSS/Atom and GitHub <code>releases.atom</code> remain useful extras — not the only way in.
-      Enable the <em>RSS / Atom</em> source on step 2 to include them in a run.
-    </p>
-    {% if feeds %}
-    <table>
-      <thead>
-        <tr><th>Name</th><th>Kind</th><th>URL</th><th>Enabled</th><th>Last fetch</th></tr>
-      </thead>
-      <tbody>
-        {% for feed in feeds %}
-        <tr>
-          <td>{{ feed.name }}</td>
-          <td>{{ feed.kind }}</td>
-          <td><code>{{ feed.url }}</code></td>
-          <td>{{ "yes" if feed.enabled else "no" }}</td>
-          <td>{{ feed.last_fetched_at or "—" }}</td>
-        </tr>
-        {% if feed.last_error %}
-        <tr><td colspan="5"><small>{{ feed.last_error }}</small></td></tr>
-        {% endif %}
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p>No feeds yet. Add one below.</p>
-    {% endif %}
-
-    <form method="post" action="/companies/discover/feeds" id="add-feed-form">
-      <fieldset>
-        <legend>Add feed</legend>
-        <label>Suggested free feed
-          <select id="feed-suggestion" aria-describedby="feed-suggestion-help">
-            <option value="">Custom — type name &amp; URL below</option>
+    <details class="more-filters">
+      <summary>RSS feeds ({{ feeds | length }})</summary>
+      {% if feeds %}
+      <table>
+        <thead><tr><th>Name</th><th>On</th></tr></thead>
+        <tbody>
+          {% for feed in feeds %}
+          <tr>
+            <td>{{ feed.name }}</td>
+            <td>{{ "yes" if feed.enabled else "no" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+      <form method="post" action="/companies/discover/feeds" id="add-feed-form">
+        <label>Suggested
+          <select id="feed-suggestion">
+            <option value="">Custom</option>
             {% for group_name, items in feed_suggestion_groups.items() %}
             <optgroup label="{{ group_name }}">
               {% for item in items %}
@@ -305,11 +240,8 @@
             {% endfor %}
           </select>
         </label>
-        <p class="tip" id="feed-suggestion-help">
-          Pick a suggestion to fill Name / URL / Kind, or leave Custom and enter your own.
-        </p>
-        <label>Name <input type="text" name="name" id="feed-name" required placeholder="Industry news"></label>
-        <label>URL <input type="url" name="url" id="feed-url" required placeholder="https://example.com/feed.xml"></label>
+        <label>Name <input type="text" name="name" id="feed-name" required></label>
+        <label>URL <input type="url" name="url" id="feed-url" required></label>
         <label>Kind
           <select name="kind" id="feed-kind">
             <option value="rss">rss</option>
@@ -318,177 +250,123 @@
           </select>
         </label>
         <button type="submit">Add feed</button>
-      </fieldset>
-    </form>
-    <p><small>Enable/disable feeds under <a href="/settings">Settings</a>.</small></p>
-    <div class="stepper-nav">
-      <button type="button" class="secondary outline" data-goto="2">← Polling</button>
-      <button type="button" class="outline" data-goto="4">Next: Live activity →</button>
-    </div>
-  </article>
-</section>
+      </form>
+    </details>
+  </aside>
 
-<section class="step-panel" data-step="4" id="step-4" hidden>
-  <article id="activity-panel">
-    <header><strong>Step 4 — Run discovery</strong></header>
-    <p class="tip" id="activity-hint">
-      Runs selected adapters in the background. Save targeting first.
-      Logs are <strong>not stored</strong> — stay on this step while it runs.
-    </p>
-    <div class="actions" style="margin-bottom:0.75rem">
-      <button type="button" id="poll-feeds-btn">Run discovery</button>
-    </div>
-    <pre id="activity-log" class="terminal-log" aria-live="polite"></pre>
-    <div class="stepper-nav">
-      <button type="button" class="secondary outline" data-goto="3">← Feeds</button>
-      <button type="button" class="outline" data-goto="5">Next: Results →</button>
-    </div>
-  </article>
-</section>
+  <div class="discover-main">
+    <article id="activity-panel">
+      <header class="row">
+        <strong>Run</strong>
+        <div class="actions">
+          <button type="button" id="poll-feeds-btn">Run discovery</button>
+        </div>
+      </header>
+      <pre id="activity-log" class="terminal-log" aria-live="polite"></pre>
+    </article>
 
-<section class="step-panel" data-step="5" id="step-5" hidden>
-  <article>
-    <header><strong>Step 5 — Results</strong></header>
-    <p class="tip">
-      Intent class is separate from ICP Fit.
-      <strong>high_intent</strong> = explicit request;
-      <strong>potential_company</strong> = ICP-like without a request;
-      <strong>emerging</strong> = transformation/expansion language;
-      <strong>low_relevance</strong> = weak evidence.
-      Counts:
-      new {{ lead_counts.get('new', 0) }},
-      qualified {{ lead_counts.get('qualified', 0) }},
-      saved {{ lead_counts.get('saved', 0) }},
-      rejected {{ lead_counts.get('rejected', 0) }}.
-    </p>
-    <form method="get" action="/companies/discover" class="filters">
-      <input type="hidden" name="stay" value="5">
-      <label>Intent
+    <article>
+      <header class="row">
+        <div>
+          <strong>Results</strong>
+          <small class="muted">
+            {{ lead_counts.get('new', 0) }} new ·
+            {{ lead_counts.get('qualified', 0) }} qualified ·
+            {{ lead_counts.get('saved', 0) }} saved ·
+            {{ lead_counts.get('rejected', 0) }} rejected
+          </small>
+        </div>
+      </header>
+      <form method="get" action="/companies/discover" class="inline-filters">
         <select name="intent">
-          <option value="">All</option>
-          {% for v in ['high_intent', 'potential_company', 'emerging', 'low_relevance'] %}
-          <option value="{{ v }}" {% if intent_filter == v %}selected{% endif %}>{{ v }}</option>
+          <option value="">All intent</option>
+          {% for v, label in [
+            ('high_intent', 'High intent'),
+            ('potential_company', 'Potential'),
+            ('emerging', 'Emerging'),
+            ('low_relevance', 'Low')
+          ] %}
+          <option value="{{ v }}" {% if intent_filter == v %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
-      </label>
-      <label>Status
         <select name="lead_status">
-          <option value="">All</option>
+          <option value="">All status</option>
           {% for v in ['new', 'qualified', 'saved', 'rejected'] %}
           <option value="{{ v }}" {% if status_filter == v %}selected{% endif %}>{{ v }}</option>
           {% endfor %}
         </select>
-      </label>
-      <button type="submit">Filter</button>
-    </form>
-    {% if leads %}
-    <table>
-      <thead>
-        <tr>
-          <th>Lead</th>
-          <th>Intent</th>
-          <th>Score</th>
-          <th>Source</th>
-          <th>Status</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for lead in leads %}
-        <tr>
-          <td>
-            <a href="{{ lead.canonical_url }}" target="_blank" rel="noopener">{{ lead.title }}</a>
-            <br><small>{{ lead.lead_kind }}{% if lead.budget_text %} · {{ lead.budget_text }}{% endif %}{% if lead.location_text %} · {{ lead.location_text }}{% endif %}</small>
-            {% if lead.excerpt %}<br><small>{{ lead.excerpt[:180] }}</small>{% endif %}
-          </td>
-          <td><span class="band band-{{ 'high' if lead.intent_class == 'high_intent' else 'medium' if lead.intent_class == 'emerging' else 'watch' if lead.intent_class == 'potential_company' else 'reject' }}">{{ lead.intent_class }}</span></td>
-          <td>{{ '%.0f'|format(lead.relevance_score) }}</td>
-          <td>{{ lead.source_name }}</td>
-          <td>{{ lead.status }}{% if lead.company_id %}<br><a href="/companies/{{ lead.company_id }}">company</a>{% endif %}</td>
-          <td>
-            {% if lead.status != 'rejected' %}
-            <form method="post" action="/leads/{{ lead.id }}/qualify"><button type="submit" class="outline">Qualify</button></form>
-            <form method="post" action="/leads/{{ lead.id }}/save"><button type="submit" class="outline">Save to companies</button></form>
-            <form method="post" action="/leads/{{ lead.id }}/reject"><button type="submit" class="outline contrast">Reject</button></form>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p>No scored leads yet. Save targeting, then run discovery — or <a href="/companies/seed">seed a known URL</a>.</p>
-    {% endif %}
+        <button type="submit" class="outline">Filter</button>
+      </form>
 
-    {% if recent %}
-    <p><strong>Companies recently seeded from feeds</strong></p>
-    <table>
-      <thead>
-        <tr><th>Company</th><th>From feed</th><th>Entry</th><th>When</th></tr>
-      </thead>
-      <tbody>
-        {% for entry, company, feed in recent %}
-        <tr>
-          <td><a href="/companies/{{ company.id }}">{{ company.name }}</a> <code>{{ company.domain }}</code></td>
-          <td>{{ feed.name }}</td>
-          <td>
-            {% if entry.title %}{{ entry.title }}{% else %}<code>{{ entry.link }}</code>{% endif %}
-          </td>
-          <td>{{ entry.created_at }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% endif %}
-    <div class="stepper-nav">
-      <button type="button" class="secondary outline" data-goto="4">← Run</button>
-      <a href="/companies" role="button" class="outline">All companies</a>
-    </div>
-  </article>
-</section>
+      {% if leads %}
+      <table>
+        <thead>
+          <tr>
+            <th>Lead</th>
+            <th>Intent</th>
+            <th>Score</th>
+            <th>Source</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lead in leads %}
+          <tr>
+            <td>
+              <a href="{{ lead.canonical_url }}" target="_blank" rel="noopener">{{ lead.title }}</a>
+              {% if lead.excerpt %}<br><small class="muted">{{ lead.excerpt[:120] }}</small>{% endif %}
+            </td>
+            <td>
+              <span class="band band-{{ 'high' if lead.intent_class == 'high_intent' else 'medium' if lead.intent_class == 'emerging' else 'watch' if lead.intent_class == 'potential_company' else 'reject' }}">
+                {% if lead.intent_class == 'high_intent' %}high
+                {% elif lead.intent_class == 'potential_company' %}potential
+                {% elif lead.intent_class == 'emerging' %}emerging
+                {% else %}low{% endif %}
+              </span>
+            </td>
+            <td>{{ '%.0f'|format(lead.relevance_score) }}</td>
+            <td>{{ lead.source_name }}</td>
+            <td class="row-actions">
+              {% if lead.status != 'rejected' %}
+              <form method="post" action="/leads/{{ lead.id }}/qualify"><button type="submit" class="outline">OK</button></form>
+              <form method="post" action="/leads/{{ lead.id }}/save"><button type="submit" class="outline">Save</button></form>
+              <form method="post" action="/leads/{{ lead.id }}/reject"><button type="submit" class="outline contrast">Skip</button></form>
+              {% else %}
+              <span class="muted">skipped</span>
+              {% endif %}
+              {% if lead.company_id %}<a href="/companies/{{ lead.company_id }}">company</a>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted">No leads yet. Save filters, then Run.</p>
+      {% endif %}
+
+      {% if recent %}
+      <details class="more-filters">
+        <summary>Recent companies from feeds</summary>
+        <table>
+          <thead><tr><th>Company</th><th>Feed</th></tr></thead>
+          <tbody>
+            {% for entry, company, feed in recent %}
+            <tr>
+              <td><a href="/companies/{{ company.id }}">{{ company.name }}</a></td>
+              <td>{{ feed.name }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </details>
+      {% endif %}
+    </article>
+  </div>
+</div>
 
 <script id="preset-data" type="application/json">{{ preset_data | tojson }}</script>
 <script id="feed-suggestion-data" type="application/json">{{ feed_suggestion_map | tojson }}</script>
 <script>
-(function () {
-  var panels = document.querySelectorAll(".step-panel");
-  var buttons = document.querySelectorAll("[data-goto]");
-  var stepBtns = document.querySelectorAll(".stepper-btn");
-
-  function goTo(step) {
-    var n = String(step);
-    panels.forEach(function (p) {
-      var on = p.getAttribute("data-step") === n;
-      p.hidden = !on;
-    });
-    stepBtns.forEach(function (b) {
-      var on = b.getAttribute("data-goto") === n;
-      if (on) b.setAttribute("aria-current", "step");
-      else b.removeAttribute("aria-current");
-    });
-    try {
-      history.replaceState(null, "", "#step-" + n);
-    } catch (e) {}
-    var el = document.getElementById("step-" + n);
-    if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
-  }
-
-  buttons.forEach(function (b) {
-    b.addEventListener("click", function () {
-      goTo(b.getAttribute("data-goto"));
-    });
-  });
-
-  var hash = (location.hash || "").replace("#step-", "");
-  var start = "1";
-  if (hash && document.getElementById("step-" + hash)) start = hash;
-  else if ({{ 'true' if leads or recent else 'false' }}) start = "5";
-  else if ({{ 'true' if feeds else 'false' }}) start = "4";
-  goTo(start);
-
-  window.__discoverGoTo = goTo;
-})();
-
 (function () {
   var feedSelect = document.getElementById("feed-suggestion");
   var feedMap = {};
@@ -543,7 +421,6 @@
 (function () {
   var btn = document.getElementById("poll-feeds-btn");
   var log = document.getElementById("activity-log");
-  var hint = document.getElementById("activity-hint");
   if (!btn || !log) return;
 
   var source = null;
@@ -567,12 +444,10 @@
 
   btn.addEventListener("click", function () {
     if (source) return;
-    if (window.__discoverGoTo) window.__discoverGoTo(4);
     log.textContent = "";
-    if (hint) hint.hidden = true;
     btn.disabled = true;
     btn.textContent = "Running…";
-    appendLine("info", "Connecting to discovery stream…");
+    appendLine("info", "Starting…");
 
     source = new EventSource("/companies/discover/poll/stream");
     source.onmessage = function (ev) {
@@ -586,14 +461,11 @@
       appendLine(data.level || "info", data.message || "");
       if (data.level === "done") {
         stop();
-        setTimeout(function () {
-          location.hash = "#step-5";
-          window.location.reload();
-        }, 900);
+        setTimeout(function () { window.location.reload(); }, 700);
       }
     };
     source.onerror = function () {
-      appendLine("error", "Connection lost. Try again.");
+      appendLine("error", "Connection lost.");
       stop();
     };
   });

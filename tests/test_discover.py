@@ -15,15 +15,11 @@ def test_discover_page_ok(client: object) -> None:
     assert b"Discover" in r.content
     assert b"activity-log" in r.content
     assert b"EventSource" in r.content
-    assert b"stepper" in r.content
-    assert b"Live activity" in r.content
-    assert b"Focus preset" in r.content
-    assert b"Include topics" in r.content
-    assert b"Suggested free feed" in r.content
-    assert b"TechCrunch" in r.content
-    assert b"Targeting" in r.content
+    assert b"discover-layout" in r.content
+    assert b"Run discovery" in r.content
+    assert b"Results" in r.content
     assert b"Hacker News" in r.content
-    assert b"data-goto" in r.content
+    assert b"TechCrunch" in r.content
 
 
 def test_poll_all_feeds_empty(session: Session) -> None:

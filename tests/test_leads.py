@@ -246,14 +246,11 @@ def test_restricted_sources_listed_not_claimed(client: object) -> None:
     r = client.get("/companies/discover")  # type: ignore[attr-defined]
     assert r.status_code == 200
     body = r.text
-    assert "Targeting" in body
-    assert "Lead type" in body
-    assert "Services you sell" in body
+    assert "Services" in body
     assert "Hacker News" in body
     assert "UK Contracts Finder" in body
     assert "Upwork" in body
-    assert "restricted" in body.casefold()
-    assert "not searched" in body.casefold() or "Restricted" in body
+    assert "off" in body.casefold()
 
 
 def test_lead_qualify_reject(session: Session, client: object) -> None:

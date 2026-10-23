@@ -4,14 +4,8 @@
 {% block content %}
 <header>
   <h1>Settings</h1>
-  <p>Operator profile, adapters, feeds, and fetch policies. Profile file: <code>{{ profile_path }}</code></p>
+  <p><code>{{ profile_path }}</code></p>
 </header>
-
-<p class="tip">
-  <strong>Tip:</strong> Profile drives ICP Fit and priority bands.
-  Feeds power auto-discovery (also on <a href="/companies/discover">Discover</a>).
-  No Google scrape — use permitted RSS/technical sources only.
-</p>
 
 {% if flash %}
 <p><mark>{{ flash }}</mark></p>
@@ -84,31 +78,16 @@
 </article>
 
 <article>
-  <header><strong>Lead discovery sources</strong></header>
-  <p>
-    Default run uses Hacker News (Algolia) and UK Contracts Finder, plus your RSS feeds.
-    Optional: set <code>SEARXNG_URL</code> for self-hosted web search, <code>GITHUB_TOKEN</code>
-    for higher GitHub issue-search limits. Upwork, Fiverr, and LinkedIn are not searched.
-  </p>
-</article>
-
-<article>
-  <header><strong>Contact discovery</strong></header>
-  <p>
-    Contacts come from permitted company pages (about / team / leadership / contact)
-    and manual entry. Generic inboxes become company channels, not people.
-    LinkedIn is never fetched. No paid enrichment APIs. Email status is evidence strength,
-    not deliverability. Run discovery from a company page or
-    <a href="/contacts">Contacts</a>.
+  <header><strong>Discovery</strong></header>
+  <p class="muted">
+    HN + UK Contracts Finder + RSS by default.
+    Optional: <code>SEARXNG_URL</code>, <code>GITHUB_TOKEN</code>.
+    Upwork / Fiverr / LinkedIn: not searched.
   </p>
 </article>
 
 <article>
   <header><strong>Feeds</strong></header>
-  <p class="tip">
-    When a feed item has a company URL, polling seeds that domain like manual seed.
-    Prefer industry blogs, product changelogs, and GitHub <code>releases.atom</code>.
-  </p>
   {% if feeds %}
   <table>
     <thead>
