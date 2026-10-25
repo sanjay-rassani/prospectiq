@@ -2,100 +2,239 @@
 {% set active = 'today' %}
 
 {% block content %}
-<header>
-  <h1>Today</h1>
-</header>
+<div class="home-desk">
+  <header class="home-hero">
+    <div class="home-hero-copy">
+      <p class="home-kicker">Your desk</p>
+      <h1 class="home-title">
+        <span class="home-title-brand">ProspectIQ</span>
+        <span class="home-title-day">Today</span>
+      </h1>
+      <p class="home-lead">
+        Find companies and project leads from public sources, research who to contact,
+        and prepare outreach drafts. <em>You</em> decide and send — nothing leaves this
+        machine automatically.
+      </p>
+      <div class="home-cta">
+        <a href="/companies/discover" role="button" class="home-cta-primary"
+           title="Filter and search public sources for new leads">Discover leads</a>
+        <a href="/companies/seed" role="button" class="secondary"
+           title="Paste a company website you already know">Seed a URL</a>
+        <a href="/settings" role="button" class="outline"
+           title="Who you sell to, industries, and score thresholds">Settings</a>
+      </div>
+    </div>
+  </header>
 
-{% if flash %}
-<p><mark>{{ flash }}</mark></p>
-{% endif %}
+  {% if flash %}
+  <p><mark>{{ flash }}</mark></p>
+  {% endif %}
 
-<article>
-  <header><strong>High-priority opportunities</strong></header>
-  {% if high_priority %}
-  <table>
-    <thead>
-      <tr><th>Company</th><th>Opportunity</th><th>Score</th><th>Status</th></tr>
-    </thead>
-    <tbody>
-      {% for opp in high_priority %}
-      <tr>
-        <td><a href="/companies/{{ opp.company_id }}">{{ opp.company.name }}</a></td>
-        <td><a href="/opportunities/{{ opp.id }}">{{ opp.title }}</a></td>
-        <td>{% if opp.opportunity_score is not none %}{{ '%.0f'|format(opp.opportunity_score) }}{% else %}—{% endif %}</td>
-        <td>{{ opp.status }}</td>
-      </tr>
+  <section class="home-stats" aria-label="Pipeline snapshot">
+    <a class="home-stat{% if high_priority %} home-stat-hot{% endif %}" href="#attention-opps"
+       title="Jump to high-priority opportunities">
+      <span class="home-stat-n">{{ high_priority|length }}</span>
+      <span class="home-stat-l">Priority deals</span>
+    </a>
+    <a class="home-stat{% if due_outreach %} home-stat-hot{% endif %}" href="#attention-outreach"
+       title="Jump to drafts awaiting action">
+      <span class="home-stat-n">{{ due_outreach|length }}</span>
+      <span class="home-stat-l">Drafts waiting</span>
+    </a>
+    <a class="home-stat{% if due_followups %} home-stat-hot{% endif %}" href="#attention-outreach"
+       title="Jump to follow-ups">
+      <span class="home-stat-n">{{ due_followups|length }}</span>
+      <span class="home-stat-l">Follow-ups due</span>
+    </a>
+    <a class="home-stat" href="/companies" title="Open company list">
+      <span class="home-stat-n">{{ company_count }}</span>
+      <span class="home-stat-l">Companies</span>
+    </a>
+    <a class="home-stat" href="/contacts" title="Open contacts directory">
+      <span class="home-stat-n">{{ contact_count }}</span>
+      <span class="home-stat-l">Contacts</span>
+    </a>
+    <a class="home-stat{% if ready_count %} home-stat-hot{% endif %}" href="/outreach"
+       title="Open outreach queue">
+      <span class="home-stat-n">{{ ready_count }}</span>
+      <span class="home-stat-l">Ready to approach</span>
+    </a>
+  </section>
+
+  {% if is_first_run %}
+  <section class="home-welcome" aria-labelledby="welcome-heading">
+    <h2 id="welcome-heading">Get started</h2>
+    <p class="home-welcome-lead">Three moves to your first outreach-ready deal idea.</p>
+    <ol class="home-steps home-steps-cards">
+      <li>
+        <span class="home-step-num" aria-hidden="true">1</span>
+        <div>
+          <strong>Set who you sell to</strong>
+          <p>Industries, services, and regions — so scoring matches your ICP.</p>
+          <a href="/settings">Open Settings →</a>
+        </div>
+      </li>
+      <li>
+        <span class="home-step-num" aria-hidden="true">2</span>
+        <div>
+          <strong>Find leads</strong>
+          <p>Run Discover with filters, or Seed a company URL you already know.</p>
+          <a href="/companies/discover">Discover →</a>
+          · <a href="/companies/seed">Seed →</a>
+        </div>
+      </li>
+      <li>
+        <span class="home-step-num" aria-hidden="true">3</span>
+        <div>
+          <strong>Work a deal</strong>
+          <p>Open an opportunity, find a contact, prepare a brief — then send it yourself.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+  {% else %}
+  <details class="home-howto">
+    <summary>How ProspectIQ works</summary>
+    <ol class="home-steps">
+      <li><strong>Discover or Seed</strong> — pull public leads or paste a domain you know.</li>
+      <li><strong>Research</strong> — pages become facts, signals, and deal ideas.</li>
+      <li><strong>Find a person</strong> — site scan or Google/LinkedIn in your browser; never invent emails.</li>
+      <li><strong>Outreach</strong> — approve a draft here; send outside the app.</li>
+      <li><strong>Today</strong> — this desk lists what needs attention next.</li>
+    </ol>
+  </details>
+  {% endif %}
+
+  <section class="home-actions" aria-label="Primary actions">
+    <a class="home-action home-action-discover" href="/companies/discover">
+      <span class="home-action-label">Start here</span>
+      <strong>Discover leads</strong>
+      <span>Filters + public sources. Best way to grow the pipeline.</span>
+    </a>
+    <a class="home-action" href="/companies/seed">
+      <span class="home-action-label">Known URL</span>
+      <strong>Seed a company</strong>
+      <span>Paste a website when you already know the prospect.</span>
+    </a>
+    <a class="home-action" href="/companies">
+      <span class="home-action-label">Browse</span>
+      <strong>Companies</strong>
+      <span>Researched orgs, ICP fit, and opportunities.</span>
+    </a>
+    <a class="home-action" href="/outreach">
+      <span class="home-action-label">Send queue</span>
+      <strong>Outreach</strong>
+      <span>Drafts to approve and follow-ups you logged.</span>
+    </a>
+  </section>
+
+  <article id="attention-opps" class="home-panel">
+    <header class="row">
+      <div>
+        <strong>High-priority opportunities</strong>
+        <span class="muted"> · worth approaching soon</span>
+      </div>
+      {% if high_priority %}
+      <a href="/companies">All companies</a>
+      {% endif %}
+    </header>
+    {% if high_priority %}
+    <table>
+      <thead>
+        <tr><th>Company</th><th>Opportunity</th><th>Score</th><th title="Hover a status for what it means">Status</th></tr>
+      </thead>
+      <tbody>
+        {% for opp in high_priority %}
+        <tr>
+          <td><a href="/companies/{{ opp.company_id }}">{{ opp.company.name }}</a></td>
+          <td><a href="/opportunities/{{ opp.id }}">{{ opp.title }}</a></td>
+          <td>{% if opp.opportunity_score is not none %}{{ '%.0f'|format(opp.opportunity_score) }}{% else %}—{% endif %}</td>
+          <td>{{ opp.status | status_badge('opportunity') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="home-empty">
+      Nothing high-priority yet.
+      {% if is_first_run %}
+      Start with <a href="/companies/discover">Discover</a> or <a href="/companies/seed">Seed</a>.
+      {% else %}
+      Check <a href="/companies">Companies</a> or run <a href="/companies/discover">Discover</a> again.
+      {% endif %}
+    </p>
+    {% endif %}
+  </article>
+
+  <article id="attention-outreach" class="home-panel">
+    <header><strong>Outreach and follow-ups due</strong></header>
+    {% if due_outreach or due_followups %}
+    {% if due_outreach %}
+    <h3>Drafts awaiting action</h3>
+    <ul>
+      {% for task in due_outreach %}
+      <li>
+        <a href="/outreach/{{ task.id }}">{{ task.opportunity.company.name }} — {{ task.opportunity.title }}</a>
+        · {{ task.status | status_badge('outreach') }}
+        {% if task.due_at %} · due {{ task.due_at | when }}{% endif %}
+      </li>
       {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p>Nothing high-priority yet.</p>
-  {% endif %}
-</article>
+    </ul>
+    {% endif %}
+    {% if due_followups %}
+    <h3>Follow-ups</h3>
+    <ul>
+      {% for item in due_followups %}
+      <li>
+        <a href="/opportunities/{{ item.opportunity_id }}">{{ item.opportunity.company.name }} — {{ item.opportunity.title }}</a>
+        · {{ item.next_action_at | when }}
+        {% if item.next_action_note %} — {{ item.next_action_note }}{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% else %}
+    <p class="home-empty">Nothing due. <a href="/outreach">Open outreach queue</a></p>
+    {% endif %}
+  </article>
 
-<article>
-  <header><strong>Outreach and follow-ups due</strong></header>
-  {% if due_outreach or due_followups %}
-  {% if due_outreach %}
-  <h3>Drafts awaiting action</h3>
-  <ul>
-    {% for task in due_outreach %}
-    <li>
-      <a href="/outreach/{{ task.id }}">{{ task.opportunity.company.name }} — {{ task.opportunity.title }}</a>
-      · {{ task.status }}
-      {% if task.due_at %} · due {{ task.due_at }}{% endif %}
-    </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% if due_followups %}
-  <h3>Follow-ups</h3>
-  <ul>
-    {% for item in due_followups %}
-    <li>
-      <a href="/opportunities/{{ item.opportunity_id }}">{{ item.opportunity.company.name }} — {{ item.opportunity.title }}</a>
-      · {{ item.next_action_at }}
-      {% if item.next_action_note %} — {{ item.next_action_note }}{% endif %}
-    </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% else %}
-  <p>Nothing due. <a href="/outreach">Open outreach queue</a></p>
-  {% endif %}
-</article>
+  <article id="attention-changes" class="home-panel">
+    <header><strong>Newly changed prospects</strong></header>
+    {% if newly_changed or resurfaced %}
+    {% if resurfaced %}
+    <h3>Resurfaced</h3>
+    <ul>
+      {% for company in resurfaced %}
+      <li>
+        <a href="/companies/{{ company.id }}">{{ company.name }}</a>
+        · resurfaced {{ company.resurfaced_at | when }}
+        · {% if company.priority %}{{ company.priority | priority_badge }}{% else %}—{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if newly_changed %}
+    <h3>Content changes (48h)</h3>
+    <ul>
+      {% for snap in newly_changed %}
+      <li>
+        <a href="/companies/{{ snap.company_id }}#snap-{{ snap.id }}">{{ snap.company.name }}</a>
+        · {{ snap.fetched_at | when }}
+        · {{ snap.title or snap.url }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% else %}
+    <p class="home-empty">No changes detected recently.</p>
+    {% endif %}
+  </article>
 
-<article>
-  <header><strong>Newly changed prospects</strong></header>
-  {% if newly_changed or resurfaced %}
-  {% if resurfaced %}
-  <h3>Resurfaced</h3>
-  <ul>
-    {% for company in resurfaced %}
-    <li>
-      <a href="/companies/{{ company.id }}">{{ company.name }}</a>
-      · resurfaced {{ company.resurfaced_at }}
-      · {{ company.priority or "—" }}
-    </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% if newly_changed %}
-  <h3>Content changes (48h)</h3>
-  <ul>
-    {% for snap in newly_changed %}
-    <li>
-      <a href="/companies/{{ snap.company_id }}#snap-{{ snap.id }}">{{ snap.company.name }}</a>
-      · {{ snap.fetched_at }}
-      · {{ snap.title or snap.url }}
-    </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% else %}
-  <p>No changes detected recently.</p>
-  {% endif %}
-</article>
-
-<p><small><a href="/jobs/failed">Failed jobs</a></small></p>
+  <p class="home-foot">
+    <small>
+      {{ attention_total }} item(s) needing attention
+      · <a href="/jobs/failed">Failed jobs</a>
+    </small>
+  </p>
+</div>
 {% endblock %}

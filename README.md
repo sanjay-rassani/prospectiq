@@ -31,9 +31,10 @@ uv pip install -e ".[dev]"
 # 2. Config
 cp .env.example .env
 
-# 3. Database
+# 3. Database (+ optional SearXNG on :8080 for Discover web research)
 docker compose up -d
 .venv/bin/alembic upgrade head
+# Set SEARXNG_URL=http://127.0.0.1:8080 in .env after SearXNG is up.
 
 # 4. Models (~7 GB total)
 ollama pull numind/nuextract3:q4_k_m   # reads pages → facts & signals

@@ -54,7 +54,7 @@
     <select name="status">
       <option value="">Any</option>
       {% for s in ['discovered', 'enriched', 'needs_research'] %}
-      <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+      <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s | status_label('person') }}</option>
       {% endfor %}
     </select>
   </label>
@@ -81,10 +81,10 @@
       <td>{{ person.role }}</td>
       <td>
         {{ person.public_email or "—" }}
-        {% if person.public_email %}<br><small>{{ person.email_status }}</small>{% endif %}
+        {% if person.public_email %}<br><small>{{ person.email_status | status_badge('evidence') }}</small>{% endif %}
       </td>
       <td>{% if person.quality_score is not none %}{{ '%.0f'|format(person.quality_score) }}{% else %}—{% endif %}</td>
-      <td>{{ person.discovery_status }}</td>
+      <td>{{ person.discovery_status | status_badge('person') }}</td>
     </tr>
     {% endfor %}
   </tbody>

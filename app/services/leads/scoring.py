@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 from app.models.lead import IntentClass, LeadKind
 from app.services.leads.filters import SERVICE_QUERY_TERMS, TargetingFilters
 
 HIGH_INTENT_PHRASES: tuple[str, ...] = (
-    "looking for",
-    "looking for a",
+    "looking for a developer",
+    "looking for developer",
+    "looking for an agency",
     "need a developer",
     "need an app",
     "need a website",
@@ -25,13 +27,54 @@ HIGH_INTENT_PHRASES: tuple[str, ...] = (
     "call for tenders",
     "build me",
     "build an app",
-    "custom software",
+    "custom software needed",
     "software needed",
     "integrate an llm",
-    "automate",
     "automation needed",
     "replace spreadsheet",
     "legacy modernization",
+    "we need a vendor",
+    "seeking proposals",
+)
+
+# Code hosts / marketplaces / package indexes — not companies asking to buy software.
+_SUPPLIER_NOISE_HOSTS = frozenset(
+    {
+        "github.com",
+        "www.github.com",
+        "gist.github.com",
+        "gitlab.com",
+        "www.gitlab.com",
+        "bitbucket.org",
+        "www.bitbucket.org",
+        "npmjs.com",
+        "www.npmjs.com",
+        "pypi.org",
+        "crates.io",
+        "packagist.org",
+        "upwork.com",
+        "www.upwork.com",
+        "fiverr.com",
+        "www.fiverr.com",
+        "freelancer.com",
+        "www.freelancer.com",
+        "stackoverflow.com",
+        "www.stackoverflow.com",
+        "reddit.com",
+        "www.reddit.com",
+    }
+)
+
+_SUPPLIER_NOISE_TITLE_MARKERS = (
+    "awesome-",
+    "awesome ",
+    "-template",
+    " template",
+    "boilerplate",
+    "starter kit",
+    "starter-kit",
+    "for hire",
+    "freelance back-end developers for hire",
 )
 
 EMERGING_PHRASES: tuple[str, ...] = (
@@ -91,6 +134,20 @@ def _blob(*parts: str | None) -> str:
     return "\n".join(p for p in parts if p).casefold()
 
 
+def is_supplier_noise(*, url: str, title: str = "") -> bool:
+    """True for repos, package lists, and hire-directory pages (not buyer leads)."""
+    host = (urlparse(url).hostname or "").casefold()
+    if host in _SUPPLIER_NOISE_HOSTS or any(
+        host.endswith("." + h) for h in _SUPPLIER_NOISE_HOSTS
+    ):
+        return True
+    path = (urlparse(url).path or "").casefold()
+    if host.endswith("github.com") and path.count("/") >= 2:
+        return True
+    title_l = (title or "").casefold()
+    return any(marker in title_l for marker in _SUPPLIER_NOISE_TITLE_MARKERS)
+
+
 def score_candidate(
     *,
     title: str,
@@ -107,6 +164,14 @@ def score_candidate(
     matched: dict[str, list[str]] = {"services": [], "industries": [], "keywords": []}
     score = 15.0
 
+    if is_supplier_noise(url=url, title=title):
+        return ScoreResult(
+            intent_class=IntentClass.LOW_RELEVANCE.value,
+            lead_kind=LeadKind.OTHER.value,
+            relevance=0,
+            reasons=["Code repo / marketplace / package page — not a buying company"],
+        )
+
     if any(ex.strip() and ex.strip().casefold() in text for ex in filters.exclude_keywords):
         return ScoreResult(
             intent_class=IntentClass.LOW_RELEVANCE.value,
@@ -114,6 +179,18 @@ def score_candidate(
             relevance=0,
             reasons=["Matched an excluded keyword"],
         )
+
+    max_age = int(getattr(filters, "max_age_days", 0) or 0)
+    if published_at is not None and max_age > 0:
+        pub = published_at if published_at.tzinfo else published_at.replace(tzinfo=UTC)
+        age_days = (datetime.now(UTC) - pub).total_seconds() / 86400
+        if age_days > max_age:
+            return ScoreResult(
+                intent_class=IntentClass.LOW_RELEVANCE.value,
+                lead_kind=LeadKind.OTHER.value,
+                relevance=0,
+                reasons=[f"Too old ({int(age_days)} days; max {max_age})"],
+            )
 
     missing_required = [
         kw for kw in filters.required_keywords if kw.strip() and kw.casefold() not in text
@@ -190,13 +267,20 @@ def score_candidate(
         reasons.append("Public budget/value mentioned")
 
     if published_at:
-        age_days = (datetime.now(UTC) - published_at).total_seconds() / 86400
-        if age_days <= 14:
-            score += 8
-            reasons.append("Listing is fresh (≤14 days)")
-        elif age_days > 180:
-            score -= 10
-            reasons.append("Listing looks stale (>180 days)")
+        pub = published_at if published_at.tzinfo else published_at.replace(tzinfo=UTC)
+        age_days = (datetime.now(UTC) - pub).total_seconds() / 86400
+        if age_days <= 7:
+            score += 14
+            reasons.append("Very fresh (≤7 days)")
+        elif age_days <= 30:
+            score += 10
+            reasons.append("Fresh (≤30 days)")
+        elif age_days <= 90:
+            score += 4
+            reasons.append("Recent (≤90 days)")
+        elif max_age <= 0 and age_days > 180:
+            score -= 20
+            reasons.append("Stale (>180 days)")
 
     edu = any(p in text for p in EDU_PHRASES)
     if intent_hits:

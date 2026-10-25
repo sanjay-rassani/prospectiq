@@ -18,9 +18,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.config import get_settings
 from app.db.session import SessionLocal, get_session
-from app.models import Company, FeedEntry, SourceFeed, SourceSnapshot
+from app.jobs.queue import enqueue_job
+from app.models import Company, FeedEntry, JobType, Person, SourceFeed, SourceSnapshot
 from app.models.lead import DiscoveryLead, LeadStatus
 from app.services.buyers.capture import add_manual_person
+from app.services.contacts.ssrf import is_safe_public_http_url
 from app.services.discovery.delete_company import delete_company
 from app.services.discovery.rss import add_feed
 from app.services.discovery.seed import refresh_company, seed_targets
@@ -37,7 +39,13 @@ from app.services.discovery.suggestions import (
 from app.services.leads.adapters import list_capabilities
 from app.services.leads.engine import run_lead_discovery
 from app.services.leads.filters import INDUSTRIES, LEAD_TYPES, SERVICES, filters_from_prefs
+from app.services.leads.locations import (
+    LOCATION_COUNTRIES,
+    LOCATION_REGIONS,
+    SEARCH_ENGINES,
+)
 from app.services.leads.persist import company_domain_from_lead
+from app.services.leads.run_history import list_discovery_runs, record_discovery_run
 from app.services.scoring.profile import (
     DEFAULT_PROFILE_PATH,
     get_operator_profile,
@@ -113,15 +121,24 @@ def discover_page(request: Request, session: SessionDep) -> HTMLResponse:
         k for k in profile.discovery.exclude_keywords if k.casefold() not in catalog_ex
     )
     intent_filter = request.query_params.get("intent") or ""
+    # Empty = active leads (hide rejected). Use lead_status=all to include rejected.
     status_filter = request.query_params.get("lead_status") or ""
     lead_stmt = select(DiscoveryLead).order_by(
         DiscoveryLead.relevance_score.desc(), DiscoveryLead.discovered_at.desc()
     )
     if intent_filter:
         lead_stmt = lead_stmt.where(DiscoveryLead.intent_class == intent_filter)
-    if status_filter:
+    if status_filter == "all":
+        pass
+    elif status_filter:
         lead_stmt = lead_stmt.where(DiscoveryLead.status == status_filter)
+    else:
+        lead_stmt = lead_stmt.where(
+            DiscoveryLead.status != LeadStatus.REJECTED.value
+        )
     leads = list(session.scalars(lead_stmt.limit(100)).all())
+    lead_contacts = _contacts_by_company_for_leads(session, leads)
+    discovery_runs = list_discovery_runs(session, limit=12)
     lead_counts = dict(
         session.execute(
             select(DiscoveryLead.status, func.count()).group_by(DiscoveryLead.status)
@@ -130,9 +147,22 @@ def discover_page(request: Request, session: SessionDep) -> HTMLResponse:
     selected_lead_types = {t.casefold() for t in profile.discovery.lead_types}
     selected_services = {s.casefold() for s in profile.discovery.services}
     selected_industries = {i.casefold() for i in profile.discovery.industries}
-    selected_sources = {s.casefold() for s in profile.discovery.enabled_sources}
+    selected_sources = {
+        s.casefold()
+        for s in profile.discovery.enabled_sources
+        if s.casefold() not in {"upwork", "fiverr", "linkedin"}
+    }
     if not selected_sources:
-        selected_sources = {"hackernews", "contracts_uk", "rss_feeds"}
+        selected_sources = {
+            "hackernews",
+            "contracts_uk",
+            "rss_feeds",
+            "custom_sources",
+        }
+    selected_locations = {g.casefold() for g in profile.discovery.geographies}
+    selected_engines = {e.casefold() for e in profile.discovery.search_engines}
+    if not selected_engines:
+        selected_engines = {"duckduckgo", "brave", "bing"}
     return templates.TemplateResponse(
         request=request,
         name="companies/discover.html",
@@ -141,6 +171,8 @@ def discover_page(request: Request, session: SessionDep) -> HTMLResponse:
             "feeds": feeds,
             "recent": recent,
             "leads": leads,
+            "lead_contacts": lead_contacts,
+            "discovery_runs": discovery_runs,
             "lead_counts": lead_counts,
             "intent_filter": intent_filter,
             "status_filter": status_filter,
@@ -171,10 +203,16 @@ def discover_page(request: Request, session: SessionDep) -> HTMLResponse:
             "lead_types": LEAD_TYPES,
             "services": SERVICES,
             "industries": INDUSTRIES,
+            "location_regions": LOCATION_REGIONS,
+            "location_countries": LOCATION_COUNTRIES,
+            "search_engines": SEARCH_ENGINES,
             "selected_lead_types": selected_lead_types,
             "selected_services": selected_services,
             "selected_industries": selected_industries,
             "selected_sources": selected_sources,
+            "selected_locations": selected_locations,
+            "selected_engines": selected_engines,
+            "custom_sources": profile.discovery.custom_sources or [],
             "source_capabilities": list_capabilities(get_settings()),
             "flash": request.query_params.get("flash"),
         },
@@ -197,11 +235,49 @@ def _dedupe_keep_order(items: list[str]) -> list[str]:
     return out
 
 
-@router.post("/companies/discover/prefs")
-async def discover_save_prefs(request: Request) -> RedirectResponse:
-    import yaml
+def _merge_custom_sources(form: Any) -> list[dict[str, str]]:
+    """Keep existing custom sources (minus removals) and append a newly typed one."""
+    remove = {str(v).strip().casefold() for v in form.getlist("remove_custom_source")}
+    kept: list[dict[str, str]] = []
+    for name, url, kind in zip(
+        form.getlist("existing_custom_name"),
+        form.getlist("existing_custom_url"),
+        form.getlist("existing_custom_kind"),
+        strict=False,
+    ):
+        url_s = str(url or "").strip()
+        if not url_s or url_s.casefold() in remove:
+            continue
+        if not is_safe_public_http_url(url_s):
+            continue
+        kept.append(
+            {
+                "name": str(name or "Custom").strip()[:120] or "Custom",
+                "url": url_s[:2048],
+                "kind": str(kind or "rss").strip()[:32] or "rss",
+            }
+        )
+    new_name = str(form.get("new_custom_name") or "").strip()
+    new_url = str(form.get("new_custom_url") or "").strip()
+    new_kind = str(form.get("new_custom_kind") or "rss").strip() or "rss"
+    existing_urls = {k["url"].casefold() for k in kept}
+    if (
+        new_url
+        and is_safe_public_http_url(new_url)
+        and new_url.casefold() not in existing_urls
+    ):
+        kept.append(
+            {
+                "name": (new_name or "Custom source")[:120],
+                "url": new_url[:2048],
+                "kind": new_kind[:32],
+            }
+        )
+    return kept[:40]
 
-    form = await request.form()
+
+def _discovery_prefs_from_form(form: Any) -> dict[str, Any]:
+    """Build the discovery prefs dict from the Discover filter form."""
     focus_preset = str(form.get("focus_preset") or "custom")
     if focus_preset not in DISCOVER_PRESETS:
         focus_preset = "custom"
@@ -225,6 +301,14 @@ async def discover_save_prefs(request: Request) -> RedirectResponse:
         min_relevance = int(str(form.get("min_relevance") or "30"))
     except ValueError:
         min_relevance = 30
+    try:
+        max_age_days = int(str(form.get("max_age_days") or "90"))
+    except ValueError:
+        max_age_days = 90
+    if max_age_days < 0:
+        max_age_days = 0
+    if max_age_days > 730:
+        max_age_days = 730
     budget_min = None
     budget_max = None
     try:
@@ -237,10 +321,7 @@ async def discover_save_prefs(request: Request) -> RedirectResponse:
     except ValueError:
         pass
 
-    data: dict[str, Any] = {}
-    if DEFAULT_PROFILE_PATH.exists():
-        data = yaml.safe_load(DEFAULT_PROFILE_PATH.read_text()) or {}
-    data["discovery"] = {
+    return {
         "focus_preset": focus_preset,
         "keywords": keywords,
         "optional_keywords": keywords,
@@ -258,21 +339,65 @@ async def discover_save_prefs(request: Request) -> RedirectResponse:
         "services": [str(v) for v in form.getlist("service_choice")],
         "industries": [str(v) for v in form.getlist("industry_choice")],
         "industry_mode": str(form.get("industry_mode") or "flexible"),
-        "geographies": _split_csv(str(form.get("geographies") or "")),
+        "geographies": _dedupe_keep_order(
+            [str(v) for v in form.getlist("location_choice")]
+        ),
         "include_remote": bool(form.get("include_remote")),
         "min_relevance": max(0, min(min_relevance, 100)),
-        "enabled_sources": [str(v) for v in form.getlist("source_choice")]
-        or ["hackernews", "contracts_uk", "rss_feeds"],
+        "max_age_days": max_age_days,
+        "enabled_sources": [
+            s
+            for s in [str(v) for v in form.getlist("source_choice")]
+            if s not in {"upwork", "fiverr", "linkedin"}
+        ]
+        or ["hackernews", "contracts_uk", "rss_feeds", "custom_sources"],
+        "search_engines": [str(v) for v in form.getlist("engine_choice")]
+        or ["duckduckgo", "brave", "bing"],
+        "use_public_searxng": bool(form.get("use_public_searxng")),
+        "custom_sources": _merge_custom_sources(form),
         "prefer_high_intent": bool(form.get("prefer_high_intent")),
         "budget_min": budget_min,
         "budget_max": budget_max,
         "budget_currency": str(form.get("budget_currency") or "").strip()[:8],
     }
+
+
+def _persist_discovery_prefs(discovery: dict[str, Any]) -> None:
+    import yaml
+
+    data: dict[str, Any] = {}
+    if DEFAULT_PROFILE_PATH.exists():
+        data = yaml.safe_load(DEFAULT_PROFILE_PATH.read_text()) or {}
+    data["discovery"] = discovery
     DEFAULT_PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     DEFAULT_PROFILE_PATH.write_text(
         yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
     )
     reload_operator_profile()
+
+
+@router.post("/companies/discover/prefs", response_model=None)
+async def discover_save_prefs(request: Request) -> Any:
+    from fastapi.responses import JSONResponse
+
+    form = await request.form()
+    discovery = _discovery_prefs_from_form(form)
+    _persist_discovery_prefs(discovery)
+    wants_json = (
+        "application/json" in (request.headers.get("accept") or "").casefold()
+        or str(request.query_params.get("ajax") or "") in {"1", "true", "yes"}
+    )
+    if wants_json:
+        return JSONResponse(
+            {
+                "ok": True,
+                "enabled_sources": discovery.get("enabled_sources") or [],
+                "min_relevance": discovery.get("min_relevance"),
+                "max_age_days": discovery.get("max_age_days"),
+                "geographies": discovery.get("geographies") or [],
+                "required_keywords": discovery.get("required_keywords") or [],
+            }
+        )
     return RedirectResponse(
         url="/companies/discover?flash=Discover filters saved",
         status_code=303,
@@ -287,8 +412,13 @@ def discover_poll_stream() -> StreamingResponse:
 
     def worker() -> None:
         session = SessionLocal()
+        log_lines: list[str] = []
         try:
             def on_progress(level: str, message: str) -> None:
+                tag = (level or "info").upper()
+                if tag == "OK":
+                    tag = "OK"
+                log_lines.append(f"[{tag}] {message}")
                 q.put({"level": level, "message": message})
 
             profile = reload_operator_profile()
@@ -296,7 +426,6 @@ def discover_poll_stream() -> StreamingResponse:
             result = run_lead_discovery(
                 session, filters, on_progress=on_progress
             )
-            session.commit()
             stats = result.as_dict()
             summary = (
                 f"Done — {stats['created']} new lead(s), "
@@ -305,11 +434,37 @@ def discover_poll_stream() -> StreamingResponse:
             )
             if stats["errors"]:
                 summary += f", {stats['errors']} source error(s)"
+            log_lines.append(f"[DONE] {summary}")
+            record_discovery_run(
+                session,
+                stats=stats,
+                summary=summary,
+                log_lines=log_lines,
+                ok=True,
+                source="stream",
+            )
+            session.commit()
             q.put({"level": "done", "message": summary, "stats": stats})
         except Exception as exc:
             session.rollback()
             logger.exception("discover poll stream failed")
-            q.put({"level": "error", "message": f"Poll failed: {exc}"})
+            err = f"Poll failed: {exc}"
+            log_lines.append(f"[ERROR] {err}")
+            try:
+                record_discovery_run(
+                    session,
+                    stats={"errors": 1},
+                    summary="Stopped with errors.",
+                    log_lines=log_lines,
+                    ok=False,
+                    error=err,
+                    source="stream",
+                )
+                session.commit()
+            except Exception:
+                session.rollback()
+                logger.exception("could not record failed discovery run")
+            q.put({"level": "error", "message": err})
             q.put(
                 {
                     "level": "done",
@@ -355,15 +510,76 @@ def discover_add_feed(
     )
 
 
+def _contacts_by_company_for_leads(
+    session: Session, leads: list[DiscoveryLead]
+) -> dict[str, dict[str, Any]]:
+    """Map company_id → {count, people[{id,name,role,email}]} for Discover table."""
+    company_ids = {lead.company_id for lead in leads if lead.company_id}
+    if not company_ids:
+        return {}
+    people = list(
+        session.scalars(
+            select(Person)
+            .where(
+                Person.company_id.in_(company_ids),
+                Person.archived_at.is_(None),
+            )
+            .order_by(Person.quality_score.desc().nullslast(), Person.name.asc())
+        ).all()
+    )
+    out: dict[str, dict[str, Any]] = {
+        str(cid): {"count": 0, "people": []} for cid in company_ids
+    }
+    for person in people:
+        key = str(person.company_id)
+        bucket = out.setdefault(key, {"count": 0, "people": []})
+        bucket["count"] += 1
+        if len(bucket["people"]) < 3:
+            bucket["people"].append(
+                {
+                    "id": str(person.id),
+                    "name": person.name,
+                    "role": person.role,
+                    "email": person.public_email,
+                }
+            )
+    return out
+
+
+def _apply_lead_qualify(lead: DiscoveryLead) -> None:
+    lead.status = LeadStatus.QUALIFIED.value
+
+
+def _apply_lead_reject(lead: DiscoveryLead) -> None:
+    lead.status = LeadStatus.REJECTED.value
+
+
+def _apply_lead_save(session: Session, lead: DiscoveryLead) -> str:
+    """Qualify or seed from a lead. Returns a short outcome label."""
+    domain = company_domain_from_lead(lead)
+    if not domain:
+        lead.status = LeadStatus.QUALIFIED.value
+        return "qualified (no domain)"
+    try:
+        outcomes = seed_targets(session, f"https://{domain}")
+    except ValueError:
+        return "save failed"
+    if outcomes:
+        lead.company_id = outcomes[0].company.id
+        lead.status = LeadStatus.SAVED.value
+        return "saved"
+    return "save failed"
+
+
 @router.post("/leads/{lead_id}/qualify")
 def lead_qualify(session: SessionDep, lead_id: UUID) -> RedirectResponse:
     lead = session.get(DiscoveryLead, lead_id)
     if lead is None:
         return RedirectResponse(url="/companies/discover?flash=Lead not found", status_code=303)
-    lead.status = LeadStatus.QUALIFIED.value
+    _apply_lead_qualify(lead)
     session.flush()
     return RedirectResponse(
-        url="/companies/discover?flash=Lead qualified#step-5", status_code=303
+        url="/companies/discover?flash=Lead qualified", status_code=303
     )
 
 
@@ -372,10 +588,10 @@ def lead_reject(session: SessionDep, lead_id: UUID) -> RedirectResponse:
     lead = session.get(DiscoveryLead, lead_id)
     if lead is None:
         return RedirectResponse(url="/companies/discover?flash=Lead not found", status_code=303)
-    lead.status = LeadStatus.REJECTED.value
+    _apply_lead_reject(lead)
     session.flush()
     return RedirectResponse(
-        url="/companies/discover?flash=Lead rejected#step-5", status_code=303
+        url="/companies/discover?flash=Lead rejected", status_code=303
     )
 
 
@@ -386,33 +602,127 @@ def lead_save(session: SessionDep, lead_id: UUID) -> RedirectResponse:
         return RedirectResponse(url="/companies/discover?flash=Lead not found", status_code=303)
     domain = company_domain_from_lead(lead)
     if not domain:
-        lead.status = LeadStatus.QUALIFIED.value
+        _apply_lead_qualify(lead)
         session.flush()
         return RedirectResponse(
             url=(
                 "/companies/discover?flash="
                 "No company domain on this listing — qualified, seed the URL manually"
-                "#step-5"
             ),
             status_code=303,
         )
-    try:
-        outcomes = seed_targets(session, f"https://{domain}")
-    except ValueError as exc:
+    outcome = _apply_lead_save(session, lead)
+    session.flush()
+    if outcome == "saved" and lead.company_id:
         return RedirectResponse(
-            url=f"/companies/discover?flash={exc}#step-5", status_code=303
+            url=f"/companies/{lead.company_id}?flash=Saved from discovery",
+            status_code=303,
         )
-    if outcomes:
-        lead.company_id = outcomes[0].company.id
-        lead.status = LeadStatus.SAVED.value
-        session.flush()
+    if outcome.startswith("qualified"):
         return RedirectResponse(
-            url=f"/companies/{outcomes[0].company.id}?flash=Saved from discovery",
+            url=(
+                "/companies/discover?flash="
+                "No company domain on this listing — qualified, seed the URL manually"
+            ),
             status_code=303,
         )
     return RedirectResponse(
-        url="/companies/discover?flash=Could not save company#step-5", status_code=303
+        url="/companies/discover?flash=Could not save company", status_code=303
     )
+
+
+@router.post("/leads/{lead_id}/find-contacts")
+def lead_find_contacts(session: SessionDep, lead_id: UUID) -> RedirectResponse:
+    """Save/seed the company if needed, then queue public-page contact discovery."""
+    lead = session.get(DiscoveryLead, lead_id)
+    if lead is None:
+        return RedirectResponse(url="/companies/discover?flash=Lead not found", status_code=303)
+
+    if lead.company_id is None:
+        domain = company_domain_from_lead(lead)
+        if not domain:
+            return RedirectResponse(
+                url=(
+                    "/companies/discover?flash="
+                    "No company website on this listing — seed a URL first"
+                ),
+                status_code=303,
+            )
+        outcome = _apply_lead_save(session, lead)
+        session.flush()
+        if outcome != "saved" or lead.company_id is None:
+            return RedirectResponse(
+                url="/companies/discover?flash=Could not save company for contact scan",
+                status_code=303,
+            )
+
+    enqueue_job(
+        session,
+        JobType.DISCOVER_CONTACTS.value,
+        entity_id=lead.company_id,
+        payload={"refresh": True, "from_lead_id": str(lead.id)},
+        dedupe_pending=True,
+    )
+    session.flush()
+    return RedirectResponse(
+        url=(
+            "/companies/discover?flash="
+            "Contact scan queued — scans about/team/contact pages on the company site"
+        ),
+        status_code=303,
+    )
+
+
+@router.post("/leads/bulk")
+async def leads_bulk(request: Request, session: SessionDep) -> RedirectResponse:
+    form = await request.form()
+    action = str(form.get("action") or "").strip().casefold()
+    raw_ids = [str(v) for v in form.getlist("lead_id")]
+    ids: list[UUID] = []
+    for raw in raw_ids:
+        try:
+            ids.append(UUID(raw))
+        except ValueError:
+            continue
+    if not ids:
+        return RedirectResponse(
+            url="/companies/discover?flash=Select at least one lead", status_code=303
+        )
+    if action not in {"qualify", "reject", "save"}:
+        return RedirectResponse(
+            url="/companies/discover?flash=Unknown bulk action", status_code=303
+        )
+
+    leads = list(
+        session.scalars(select(DiscoveryLead).where(DiscoveryLead.id.in_(ids))).all()
+    )
+    by_id = {lead.id: lead for lead in leads}
+    ok = 0
+    skipped = 0
+    for lead_id in ids:
+        lead = by_id.get(lead_id)
+        if lead is None:
+            skipped += 1
+            continue
+        if action == "qualify":
+            _apply_lead_qualify(lead)
+            ok += 1
+        elif action == "reject":
+            _apply_lead_reject(lead)
+            ok += 1
+        else:
+            result = _apply_lead_save(session, lead)
+            if result == "save failed":
+                skipped += 1
+            else:
+                ok += 1
+    session.flush()
+
+    label = {"qualify": "OK", "reject": "rejected", "save": "saved"}[action]
+    flash = f"Bulk {label}: {ok} lead(s)"
+    if skipped:
+        flash += f", {skipped} could not be updated"
+    return RedirectResponse(url=f"/companies/discover?flash={flash}", status_code=303)
 
 
 @router.post("/companies/seed", response_class=HTMLResponse, response_model=None)
@@ -533,6 +843,7 @@ def company_add_person(
     role: Annotated[str, Form()],
     public_email: Annotated[str, Form()] = "",
     public_profile_url: Annotated[str, Form()] = "",
+    return_to: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
     company = session.get(Company, company_id)
     if company is None:
@@ -547,8 +858,22 @@ def company_add_person(
             public_profile_url=public_profile_url or None,
         )
     except ValueError as exc:
+        dest = return_to.strip()
+        if dest.startswith("/opportunities/"):
+            sep = "&" if "?" in dest else "?"
+            return RedirectResponse(
+                url=f"{dest}{sep}flash={exc}",
+                status_code=303,
+            )
         return RedirectResponse(
             url=f"/companies/{company_id}?flash={exc}",
+            status_code=303,
+        )
+    dest = return_to.strip()
+    if dest.startswith("/opportunities/"):
+        sep = "&" if "?" in dest else "?"
+        return RedirectResponse(
+            url=f"{dest}{sep}step=2&flash=Added {person.name}",
             status_code=303,
         )
     return RedirectResponse(

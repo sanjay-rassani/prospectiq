@@ -14,8 +14,8 @@
     <h1>{{ company.name }}</h1>
     <p>
       <code>{{ company.domain }}</code>
-      · {{ company.status }}
-      {% if company.priority %} · ICP band <span class="band band-{{ company.priority }}">{{ company.priority }}</span>{% endif %}
+      · {{ company.status | status_badge('company') }}
+      {% if company.priority %} · ICP band {{ company.priority | priority_badge }}{% endif %}
       {% if company.icp_score is not none %} · ICP Fit <strong>{{ '%.0f'|format(company.icp_score) }}</strong>{% endif %}
       {% if company.seed_url %} · <a href="{{ company.seed_url }}" target="_blank" rel="noopener">seed URL</a>{% endif %}
     </p>
@@ -25,7 +25,7 @@
       <button type="submit">Refresh now</button>
     </form>
     <form method="post" action="/companies/{{ company.id }}/delete"
-          onsubmit="return confirm('Delete this company and all related data? This cannot be undone.');">
+          data-confirm="Delete this company and all related data? This cannot be undone.">
       <button type="submit" class="outline contrast">Delete company</button>
     </form>
   </div>
@@ -54,7 +54,7 @@
   {% if company.icp_score is not none %}
   <p>
     Score <strong>{{ '%.1f'|format(company.icp_score) }}</strong>
-    {% if company.priority %} · band <span class="band band-{{ company.priority }}">{{ company.priority }}</span>{% endif %}
+    {% if company.priority %} · band {{ company.priority | priority_badge }}{% endif %}
   </p>
   {% if company.icp_reasons_json and company.icp_reasons_json.dimensions %}
   <table>
@@ -81,7 +81,7 @@
   {% if company.facts_json %}
   <p>
     <small>
-      Extracted {{ company.facts_extracted_at or "—" }}
+      Extracted {{ company.facts_extracted_at | when }}
       {% if company.facts_snapshot_id %}
       · from <a href="#snap-{{ company.facts_snapshot_id }}">source snapshot</a>
       {% endif %}
@@ -191,8 +191,8 @@
         <td><a href="/opportunities/{{ opp.id }}">{{ opp.title }}</a></td>
         <td>{{ opp.solution_family }}</td>
         <td>{% if opp.opportunity_score is not none %}{{ '%.0f'|format(opp.opportunity_score) }}{% else %}—{% endif %}</td>
-        <td>{% if opp.priority %}<span class="band band-{{ opp.priority }}">{{ opp.priority }}</span>{% else %}—{% endif %}</td>
-        <td>{{ opp.status }}</td>
+        <td>{% if opp.priority %}{{ opp.priority | priority_badge }}{% else %}—{% endif %}</td>
+        <td>{{ opp.status | status_badge('opportunity') }}</td>
         <td>{{ opp.buyer_role }}</td>
       </tr>
       {% endfor %}
@@ -255,9 +255,9 @@
         <td>{{ person.role }}{% if person.department %} <small>({{ person.department }})</small>{% endif %}</td>
         <td>
           {{ person.public_email or "—" }}
-          {% if person.public_email %}<br><small>{{ person.email_status }}</small>{% endif %}
+          {% if person.public_email %}<br><small>{{ person.email_status | status_badge('evidence') }}</small>{% endif %}
         </td>
-        <td>{{ person.discovery_status }}</td>
+        <td>{{ person.discovery_status | status_badge('person') }}</td>
         <td>{% if person.quality_score is not none %}{{ '%.0f'|format(person.quality_score) }}{% else %}—{% endif %}</td>
         <td>
           {% if person.public_profile_url %}
@@ -326,7 +326,7 @@
     <tbody>
       {% for snap in company.snapshots %}
       <tr{% if company.facts_snapshot_id == snap.id %} class="facts-source"{% endif %}>
-        <td>{{ snap.fetched_at }}</td>
+        <td>{{ snap.fetched_at | when }}</td>
         <td>{{ snap.source_type }}</td>
         <td>
           <a href="#snap-{{ snap.id }}">{{ snap.title or snap.url }}</a>
@@ -353,8 +353,8 @@
     <h3>{{ snap.title or snap.url }}</h3>
     <p>
       <small>
-        {{ snap.url }} · {{ snap.fetched_at }}
-        {% if snap.published_at %} · published {{ snap.published_at }}{% endif %}
+        {{ snap.url }} · {{ snap.fetched_at | when }}
+        {% if snap.published_at %} · published {{ snap.published_at | when }}{% endif %}
         · {{ snap.text|length }} chars
       </small>
     </p>

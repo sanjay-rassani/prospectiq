@@ -5,6 +5,7 @@
 <header>
   <h1>Settings</h1>
   <p><code>{{ profile_path }}</code></p>
+  <p class="muted">Who you sell to and how scoring works. Discover filters (sources, engines, lead types) live on <a href="/companies/discover">Discover</a>.</p>
 </header>
 
 {% if flash %}
@@ -26,18 +27,88 @@
     <label>Positioning
       <input type="text" name="positioning" value="{{ profile.positioning }}">
     </label>
-    <label>Target industries (comma-separated)
-      <input type="text" name="target_industries" value="{{ profile.target_industries | join(', ') }}">
-    </label>
-    <label>Target regions
-      <input type="text" name="target_regions" value="{{ profile.target_regions | join(', ') }}">
-    </label>
-    <label>Excluded industries
-      <input type="text" name="excluded_industries" value="{{ profile.excluded_industries | join(', ') }}">
-    </label>
-    <label>Preferred solution families
-      <input type="text" name="preferred_solution_families" value="{{ profile.preferred_solution_families | join(', ') }}">
-    </label>
+
+    <fieldset class="choice-fieldset compact">
+      <legend>Target industries</legend>
+      <p class="muted"><small>Same industry list as Discover. Used for ICP scoring.</small></p>
+      <div class="choice-grid">
+        {% for key, label in industries %}
+        <label class="checkbox-option">
+          <input type="checkbox" name="industry_choice" value="{{ key }}"
+            {% if key.casefold() in selected_industries %}checked{% endif %}>
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+      <label>Other industries
+        <input type="text" name="custom_industries" value="{{ custom_industries_value }}"
+          placeholder="software, retail, …">
+      </label>
+    </fieldset>
+
+    <fieldset class="choice-fieldset compact">
+      <legend>Target locations</legend>
+      <p class="muted"><small>
+        Hold Ctrl (Windows/Linux) or Cmd (Mac) to select multiple countries — same list as Discover.
+      </small></p>
+      <label>Countries
+        <select name="region_choice" multiple size="12" class="location-select">
+          <optgroup label="Regions">
+            {% for key, label in location_regions %}
+            <option value="{{ key }}"
+              {% if key.casefold() in selected_regions %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Countries">
+            {% for key, label in location_countries %}
+            <option value="{{ key }}"
+              {% if key.casefold() in selected_regions %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </optgroup>
+        </select>
+      </label>
+      <label>Other locations
+        <input type="text" name="custom_regions" value="{{ custom_regions_value }}"
+          placeholder="Middle East, …">
+      </label>
+    </fieldset>
+
+    <fieldset class="choice-fieldset compact">
+      <legend>Excluded industries</legend>
+      <p class="muted"><small>Hard-avoid sectors for scoring.</small></p>
+      <div class="choice-grid">
+        {% for key, label in industries %}
+        <label class="checkbox-option">
+          <input type="checkbox" name="exclude_industry_choice" value="{{ key }}"
+            {% if key.casefold() in selected_excluded_industries %}checked{% endif %}>
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+      <label>Other excludes
+        <input type="text" name="custom_excluded_industries" value="{{ custom_excluded_industries_value }}"
+          placeholder="recruiting, gambling, adult">
+      </label>
+    </fieldset>
+
+    <fieldset class="choice-fieldset compact">
+      <legend>Services / solution families</legend>
+      <p class="muted"><small>Same service list as Discover. Used for solution-fit scoring.</small></p>
+      <div class="choice-grid">
+        {% for key, label in services %}
+        <label class="checkbox-option">
+          <input type="checkbox" name="service_choice" value="{{ key }}"
+            {% if key.casefold() in selected_services %}checked{% endif %}>
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+      <label>Other families
+        <input type="text" name="custom_services" value="{{ custom_services_value }}"
+          placeholder="legacy keys if needed">
+      </label>
+    </fieldset>
+
     <div class="grid">
       <label>Band high <input type="number" step="1" name="band_high" value="{{ profile.thresholds.band_high }}"></label>
       <label>Band medium <input type="number" step="1" name="band_medium" value="{{ profile.thresholds.band_medium }}"></label>
@@ -61,7 +132,8 @@
 </article>
 
 <article>
-  <header><strong>Adapters</strong></header>
+  <header><strong>Company pipeline adapters</strong></header>
+  <p class="muted"><small>How companies get into / refresh in the pipeline (Seed, RSS feeds, page refresh).</small></p>
   <table>
     <thead><tr><th>Kind</th><th>Label</th><th>Default</th><th>Description</th></tr></thead>
     <tbody>
@@ -78,16 +150,33 @@
 </article>
 
 <article>
-  <header><strong>Discovery</strong></header>
+  <header><strong>Discover sources</strong></header>
   <p class="muted">
-    HN + UK Contracts Finder + RSS by default.
-    Optional: <code>SEARXNG_URL</code>, <code>GITHUB_TOKEN</code>.
-    Upwork / Fiverr / LinkedIn: not searched.
+    Filter-driven lead discovery on <a href="/companies/discover">Discover</a>.
+    Turn sources on/off there (and pick SearXNG engines). Marketplaces are never scraped.
   </p>
+  <ul class="source-list">
+    {% for cap in source_capabilities %}
+    <li>
+      <strong>{{ cap.label }}</strong>
+      {% if cap.availability == 'optional_config' %}
+      <span class="band band-watch" title="{{ cap.requires_config or 'Needs setup' }}">setup</span>
+      {% else %}
+      <span class="band band-high">ready</span>
+      {% endif %}
+      {% if cap.description %}<br><small class="muted">{{ cap.description }}</small>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="muted"><small>
+    Optional env: <code>SEARXNG_URL</code>, <code>GITHUB_TOKEN</code>.
+    Custom RSS/Atom sources are added on Discover.
+  </small></p>
 </article>
 
 <article>
   <header><strong>Feeds</strong></header>
+  <p class="muted"><small>RSS / Atom / GitHub releases used by the company pipeline and Discover’s RSS source.</small></p>
   {% if feeds %}
   <table>
     <thead>
@@ -100,11 +189,14 @@
         <td>{{ feed.kind }}</td>
         <td><code>{{ feed.url }}</code></td>
         <td>{{ "yes" if feed.enabled else "no" }}</td>
-        <td>{{ feed.last_fetched_at or "—" }}</td>
+        <td>{{ feed.last_fetched_at | when }}</td>
         <td>
           <form method="post" action="/settings/feeds/{{ feed.id }}/poll" style="display:inline"><button type="submit" class="outline">Poll</button></form>
           <form method="post" action="/settings/feeds/{{ feed.id }}/toggle" style="display:inline"><button type="submit" class="secondary">Toggle</button></form>
-          <form method="post" action="/settings/feeds/{{ feed.id }}/delete" style="display:inline"><button type="submit" class="contrast">Remove</button></form>
+          <form method="post" action="/settings/feeds/{{ feed.id }}/delete" style="display:inline"
+                data-confirm="Remove this feed? It will stop being polled.">
+            <button type="submit" class="contrast">Remove</button>
+          </form>
         </td>
       </tr>
       {% if feed.last_error %}
@@ -149,7 +241,10 @@
   {% endif %}
   <form method="post" action="/settings/domain-policy">
     <label>Domain <input type="text" name="domain" required placeholder="app.example.com"></label>
-    <label><input type="checkbox" name="playwright_fallback" value="on"> Enable Playwright fallback</label>
+    <label class="checkbox-option">
+      <input type="checkbox" name="playwright_fallback" value="on">
+      Enable Playwright fallback
+    </label>
     <label>Notes <input type="text" name="notes"></label>
     <button type="submit">Save policy</button>
   </form>

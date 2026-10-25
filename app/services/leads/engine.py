@@ -68,6 +68,7 @@ def run_lead_discovery(
         caps = {c.key: c for c in list_capabilities(settings)}
         enabled = [k for k in filters.enabled_sources if k in registry]
         emit(on_progress, "info", f"Discovery starting — {len(enabled)} source(s) selected")
+        emit(on_progress, "info", _filters_summary(filters, caps))
         for key in [c.key for c in list_capabilities(settings)]:
             cap = caps[key]
             adapter = registry[key]
@@ -181,3 +182,35 @@ def listing_is_project_host(url: str) -> bool:
 
     host = listing_host(url)
     return host in LISTING_HOSTS or any(host.endswith("." + h) for h in LISTING_HOSTS)
+
+
+def _filters_summary(filters: TargetingFilters, caps: dict[str, object]) -> str:
+    """Short line so the operator can confirm Run used the selected filters."""
+    labels: list[str] = []
+    for key in filters.enabled_sources:
+        cap = caps.get(key)
+        labels.append(getattr(cap, "label", key) if cap is not None else key)
+    bits = [
+        "Applying filters: sources=" + (", ".join(labels) if labels else "(none)"),
+        f"min score={filters.min_relevance}",
+    ]
+    if filters.max_age_days > 0:
+        bits.append(f"max age={filters.max_age_days}d")
+    else:
+        bits.append("max age=any")
+    if filters.geographies:
+        geo = ", ".join(filters.geographies[:6])
+        if len(filters.geographies) > 6:
+            geo += f" (+{len(filters.geographies) - 6})"
+        bits.append(f"locations={geo}")
+    if filters.include_remote:
+        bits.append("remote allowed")
+    if filters.required_keywords:
+        bits.append("must include=" + ", ".join(filters.required_keywords[:6]))
+    if filters.services:
+        bits.append(f"services={len(filters.services)}")
+    if filters.industries:
+        bits.append(f"industries={len(filters.industries)} ({filters.industry_mode})")
+    if filters.search_engines and "searxng" in filters.enabled_sources:
+        bits.append("engines=" + ", ".join(filters.search_engines[:5]))
+    return " · ".join(bits)

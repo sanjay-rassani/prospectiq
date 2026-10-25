@@ -28,6 +28,18 @@ _PERMITTED_PATH_FRAGMENTS = (
     "/who-we-are",
     "/meet-the-team",
     "/management",
+    "/staff",
+    "/executives",
+    "/founders",
+    "/founder",
+    "/board",
+    "/crew",
+    "/directory",
+    "/bios",
+    "/faculty",
+    "/partners",
+    "/imprint",
+    "/impressum",  # DE/AT legal pages often list named contacts
 )
 
 

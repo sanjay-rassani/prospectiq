@@ -1,5 +1,4 @@
-# Postgres only. Ollama runs as a host systemd service rather than a container so it
-# gets direct CPU access, which matters on a machine with no discrete GPU (decision D-03).
+# Postgres + optional SearXNG. Ollama stays on the host (decision D-03).
 services:
   db:
     image: postgres:17-alpine
@@ -20,6 +19,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Self-hosted metasearch for Discover. JSON format enabled in deploy/searxng/settings.yml.
+  searxng:
+    image: searxng/searxng:latest
+    container_name: prospectiq-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./deploy/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      SEARXNG_BASE_URL: http://127.0.0.1:8080/
+      SEARXNG_LIMITER: "false"
 
 volumes:
   pgdata:

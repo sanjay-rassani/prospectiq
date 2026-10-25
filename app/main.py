@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
@@ -33,6 +33,8 @@ from app.db.session import get_session
 from app.jobs.scheduler import start_scheduler, stop_scheduler
 from app.services.monitoring.today import load_today
 from app.services.sanitize import sanitize_for_display
+from app.ui.datetime_display import format_when, when_badge
+from app.ui.labels import priority_badge, status_badge, status_label
 
 settings = get_settings()
 
@@ -93,6 +95,11 @@ app.state.auth_secret = _auth_secret
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 templates.env.filters["sanitize"] = sanitize_for_display
+templates.env.filters["status_label"] = status_label
+templates.env.filters["status_badge"] = status_badge
+templates.env.filters["priority_badge"] = priority_badge
+templates.env.filters["when"] = when_badge
+templates.env.filters["when_text"] = format_when
 app.state.templates = templates
 
 app.include_router(companies_router)
@@ -120,6 +127,12 @@ def health(session: Session = Depends(get_session)) -> dict[str, Any]:
         "database": database,
         "env": settings.env,
     }
+
+
+@app.get("/.well-known/appspecific/com.chrome.devtools.json")
+def chrome_devtools_well_known() -> Response:
+    """Chrome DevTools probes this URL; return empty JSON to avoid noisy 404 logs."""
+    return Response(content="{}", media_type="application/json")
 
 
 @app.get("/", response_class=HTMLResponse)

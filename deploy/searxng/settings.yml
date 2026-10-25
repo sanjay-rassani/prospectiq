@@ -1,0 +1,29 @@
+# Local SearXNG for ProspectIQ Discover research.
+# Enables JSON API so the app can search without scraping Google HTML.
+# Docs: https://docs.searxng.org/admin/settings/
+
+use_default_settings: true
+
+general:
+  instance_name: "ProspectIQ SearXNG"
+  debug: false
+
+server:
+  # Overwritten / generated on first run if empty; keep a stable local secret.
+  secret_key: "prospectiq-local-searxng-change-me"
+  limiter: false
+  image_proxy: false
+  # Bind inside the container; docker-compose maps 127.0.0.1:8080.
+  bind_address: "0.0.0.0"
+  port: 8080
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  # html for browser; json required by ProspectIQ Discover.
+  formats:
+    - html
+    - json
+
+ui:
+  static_use_hash: true

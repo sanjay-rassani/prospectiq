@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.config import Settings
@@ -73,11 +73,22 @@ class ContractsUkAdapter:
             return []
 
         items = _extract_items(payload)
+        max_age = int(getattr(filters, "max_age_days", 0) or 0)
+        cutoff = datetime.now(UTC) - timedelta(days=max_age) if max_age > 0 else None
         found: list[RawCandidate] = []
-        for item in items[:limit]:
+        for item in items[: limit * 2]:
             cand = _from_item(item)
-            if cand:
-                found.append(cand)
+            if not cand:
+                continue
+            if cutoff is not None and cand.published_at is not None:
+                pub = cand.published_at
+                if pub.tzinfo is None:
+                    pub = pub.replace(tzinfo=UTC)
+                if pub < cutoff:
+                    continue
+            found.append(cand)
+            if len(found) >= limit:
+                break
         emit(on_progress, "ok", f"Contracts Finder: {len(found)} notice(s)")  # type: ignore[arg-type]
         return found
 

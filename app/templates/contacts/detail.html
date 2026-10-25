@@ -17,7 +17,7 @@
       {{ person.role }}
       {% if person.department %} · {{ person.department }}{% endif %}
       {% if person.seniority %} · {{ person.seniority }}{% endif %}
-      · <span class="band">{{ person.discovery_status }}</span>
+      · {{ person.discovery_status | status_badge('person') }}
       {% if person.quality_score is not none %} · quality {{ '%.0f'|format(person.quality_score) }}{% endif %}
     </p>
   </div>
@@ -26,7 +26,7 @@
       <button type="submit" class="outline">Enrich / re-discover</button>
     </form>
     <form method="post" action="/contacts/{{ person.id }}/archive"
-          onsubmit="return confirm('Archive this contact?');">
+          data-confirm="Archive this contact? It will be hidden from active lists.">
       <button type="submit" class="outline">Archive</button>
     </form>
   </div>
@@ -44,7 +44,7 @@
     <dt>Email</dt>
     <dd>
       {{ person.public_email or "—" }}
-      {% if person.public_email %} · <small>status: {{ person.email_status }}</small>{% endif %}
+      {% if person.public_email %} · <small>{{ person.email_status | status_badge('evidence') }}</small>{% endif %}
     </dd>
     <dt>Phone</dt>
     <dd>{{ person.public_phone or "—" }}</dd>
@@ -52,7 +52,7 @@
     <dd>
       {% if person.public_profile_url %}
       <a href="{{ person.public_profile_url }}" target="_blank" rel="noopener">{{ person.public_profile_url }}</a>
-      · <small>{{ person.profile_status }}</small>
+      · <small>{{ person.profile_status | status_badge('evidence') }}</small>
       {% else %}
       —
       {% endif %}
@@ -60,14 +60,12 @@
     <dt>Source</dt>
     <dd>{{ person.source }}</dd>
     <dt>Last researched</dt>
-    <dd>{{ person.last_researched_at or "—" }}</dd>
+    <dd>{{ person.last_researched_at | when }}</dd>
     <dt>Verified at</dt>
-    <dd>{{ person.verified_at or "—" }}</dd>
+    <dd>{{ person.verified_at | when }}</dd>
   </dl>
-  <p><small>
-    Email status is evidence strength, not inbox deliverability.
-    <code>source_confirmed</code> means the address appeared next to this person on a public page.
-    <code>manually_verified</code> means you confirmed it.
+  <p class="muted"><small>
+    Email labels are evidence strength, not inbox deliverability. Hover a label for what it means.
   </small></p>
 </article>
 
@@ -89,7 +87,7 @@
       <tr>
         <td>{{ field }}</td>
         <td>{{ rec.value }}</td>
-        <td>{{ rec.status }}</td>
+        <td>{{ rec.status | status_badge('evidence') }}</td>
         <td>
           {% if rec.source_url and rec.source_url != 'manual' %}
           <a href="{{ rec.source_url }}" target="_blank" rel="noopener">source</a>
@@ -138,7 +136,7 @@
 </article>
 
 <form method="post" action="/contacts/{{ person.id }}/delete"
-      onsubmit="return confirm('Permanently delete this contact?');">
+      data-confirm="Permanently delete this contact? This cannot be undone.">
   <button type="submit" class="outline contrast">Delete permanently</button>
 </form>
 {% endblock %}

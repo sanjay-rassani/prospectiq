@@ -156,6 +156,46 @@ def test_reject_guessed_email_pattern() -> None:
     assert people[0].public_email == "alice.wonder@acme-contacts.example"
 
 
+def test_extract_alternate_person_patterns() -> None:
+    text = """
+    Dana Lee (CEO)
+    dana@acme-contacts.example
+
+    CTO: Evan Park
+    evan@acme-contacts.example
+
+    Fay Quinn
+    Head of Engineering
+    """
+    people = extract_people_from_text(text, company_domain="acme-contacts.example")
+    by_name = {p.name: p for p in people}
+    assert "Dana Lee" in by_name
+    assert "ceo" in by_name["Dana Lee"].role.casefold()
+    assert by_name["Dana Lee"].public_email == "dana@acme-contacts.example"
+    assert "Evan Park" in by_name
+    assert "Fay Quinn" in by_name
+    assert "engineering" in by_name["Fay Quinn"].role.casefold()
+
+
+def test_candidate_urls_include_homepage_and_founders() -> None:
+    from app.services.contacts.pages import candidate_people_urls
+
+    company = Company(
+        name="Acme",
+        domain="acme-contacts.example",
+        industry="Logistics",
+        size_hint="medium",
+        description="x",
+        status="researched",
+        seed_url="https://acme-contacts.example/",
+    )
+    urls = candidate_people_urls(company, [])
+    joined = " ".join(urls).casefold()
+    assert "acme-contacts.example/" in joined or joined.endswith("acme-contacts.example")
+    assert "/founders" in joined or "/team" in joined
+    assert "/impressum" in joined or "/contact" in joined
+
+
 def test_upsert_dedupes_and_enriches(session: Session) -> None:
     company = _company(session)
     snap = _snapshot(
@@ -375,7 +415,7 @@ def test_discover_job_handler(session: Session) -> None:
     # Run handler with offline network path (max_urls 0 → snapshots only)
     job.status = JobStatus.RUNNING.value
     msg = handle_job(session, job)
-    assert "Contacts:" in msg
+    assert "new" in msg.casefold() or "updated" in msg.casefold() or "listed" in msg.casefold()
     from sqlalchemy import select
 
     people = list(session.scalars(select(Person).where(Person.company_id == company.id)).all())
@@ -430,7 +470,28 @@ def test_contacts_filters_and_opportunity_outreach(session: Session, client) -> 
 
     r_opp = client.get(f"/opportunities/{opp.id}")
     assert r_opp.status_code == 200
-    assert "Recommended contacts" in r_opp.text or "Ops Lead" in r_opp.text
+    assert "Ops Lead" in r_opp.text
+    assert "Find contact" in r_opp.text
+    assert "Find contacts on website" in r_opp.text
+    assert "Open LinkedIn search" in r_opp.text
+    assert "Ready to approach" in r_opp.text
+    assert 'title="' in r_opp.text
+
+    r_find = client.post(
+        f"/opportunities/{opp.id}/discover-contacts",
+        follow_redirects=False,
+    )
+    assert r_find.status_code == 303
+    loc = r_find.headers.get("location", "")
+    assert "finding=1" in loc
+    assert "step=2" in loc
+
+    with client.stream("GET", f"/opportunities/{opp.id}/discover-contacts/stream") as stream:  # type: ignore[attr-defined]
+        assert stream.status_code == 200
+        assert "text/event-stream" in stream.headers.get("content-type", "")
+        chunk = next(stream.iter_bytes())
+        assert b"data:" in chunk
+        assert b"message" in chunk
 
     r_out = client.post(
         f"/opportunities/{opp.id}/outreach",

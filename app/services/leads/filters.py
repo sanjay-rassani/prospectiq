@@ -92,9 +92,20 @@ class TargetingFilters(BaseModel):
     optional_keywords: list[str] = Field(default_factory=list)
     exclude_keywords: list[str] = Field(default_factory=list)
     min_relevance: int = 30
+    max_age_days: int = 90
     enabled_sources: list[str] = Field(
-        default_factory=lambda: ["hackernews", "contracts_uk", "rss_feeds"]
+        default_factory=lambda: [
+            "hackernews",
+            "contracts_uk",
+            "rss_feeds",
+            "custom_sources",
+        ]
     )
+    search_engines: list[str] = Field(
+        default_factory=lambda: ["duckduckgo", "brave", "bing"]
+    )
+    use_public_searxng: bool = True
+    custom_sources: list[dict[str, str]] = Field(default_factory=list)
     prefer_high_intent: bool = True
     budget_min: float | None = None
     budget_max: float | None = None
@@ -114,10 +125,32 @@ class TargetingFilters(BaseModel):
     def _clamp_relevance(cls, value: int) -> int:
         return max(0, min(int(value), 100))
 
+    @field_validator("max_age_days")
+    @classmethod
+    def _clamp_age(cls, value: int) -> int:
+        # 0 = unlimited; otherwise cap at 2 years.
+        days = int(value)
+        if days <= 0:
+            return 0
+        return max(1, min(days, 730))
+
     @field_validator("max_per_source")
     @classmethod
     def _clamp_max(cls, value: int) -> int:
         return max(1, min(int(value), 50))
+
+
+def searx_time_range(max_age_days: int) -> str | None:
+    """Map max age to SearXNG's time_range (day|week|month|year)."""
+    if max_age_days <= 0:
+        return None
+    if max_age_days <= 1:
+        return "day"
+    if max_age_days <= 7:
+        return "week"
+    if max_age_days <= 45:
+        return "month"
+    return "year"
 
 
 def filters_from_prefs(
@@ -135,7 +168,18 @@ def filters_from_prefs(
         geos = [g.strip() for g in profile.target_regions if g.strip()]
     sources = list(prefs.enabled_sources or [])
     if not sources:
-        sources = ["hackernews", "contracts_uk", "rss_feeds"]
+        sources = ["hackernews", "contracts_uk", "rss_feeds", "custom_sources"]
+    # Drop retired marketplace placeholders if still in old profiles.
+    sources = [s for s in sources if s not in {"upwork", "fiverr", "linkedin"}]
+    custom = [
+        {
+            "name": str(s.get("name") or ""),
+            "url": str(s.get("url") or ""),
+            "kind": str(s.get("kind") or "rss"),
+        }
+        for s in (prefs.custom_sources or [])
+        if isinstance(s, dict) and str(s.get("url") or "").strip()
+    ]
     return TargetingFilters(
         lead_types=list(prefs.lead_types or ["project_request", "company_seeking_dev"]),
         services=list(prefs.services or []),
@@ -147,7 +191,11 @@ def filters_from_prefs(
         optional_keywords=optional,
         exclude_keywords=list(prefs.exclude_keywords or []),
         min_relevance=int(prefs.min_relevance or 30),
+        max_age_days=int(getattr(prefs, "max_age_days", 90) or 0),
         enabled_sources=sources,
+        search_engines=list(prefs.search_engines or ["duckduckgo", "brave", "bing"]),
+        use_public_searxng=bool(prefs.use_public_searxng),
+        custom_sources=custom,
         prefer_high_intent=bool(prefs.prefer_high_intent),
         budget_min=prefs.budget_min,
         budget_max=prefs.budget_max,

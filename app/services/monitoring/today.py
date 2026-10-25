@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
@@ -14,6 +14,7 @@ from app.models import (
     OpportunityStatus,
     OutreachTask,
     OutreachTaskStatus,
+    Person,
     SourceSnapshot,
 )
 
@@ -21,6 +22,24 @@ from app.models import (
 def load_today(session: Session) -> dict[str, object]:
     now = datetime.now(UTC)
     since = now - timedelta(hours=48)
+
+    company_count = int(session.scalar(select(func.count()).select_from(Company)) or 0)
+    contact_count = int(
+        session.scalar(
+            select(func.count())
+            .select_from(Person)
+            .where(Person.archived_at.is_(None))
+        )
+        or 0
+    )
+    ready_count = int(
+        session.scalar(
+            select(func.count())
+            .select_from(Opportunity)
+            .where(Opportunity.status == OpportunityStatus.OUTREACH_READY.value)
+        )
+        or 0
+    )
 
     high_priority = list(
         session.scalars(
@@ -101,10 +120,18 @@ def load_today(session: Session) -> dict[str, object]:
         ).all()
     )
 
+    attention_total = (
+        len(high_priority) + len(due_outreach) + len(due_followups) + len(resurfaced)
+    )
     return {
         "high_priority": high_priority,
         "due_outreach": due_outreach,
         "due_followups": due_followups,
         "newly_changed": newly_changed,
         "resurfaced": resurfaced,
+        "company_count": company_count,
+        "contact_count": contact_count,
+        "ready_count": ready_count,
+        "attention_total": attention_total,
+        "is_first_run": company_count == 0,
     }

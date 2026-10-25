@@ -34,18 +34,18 @@
     <tr>
       <td><a href="/companies/{{ company.id }}">{{ company.name }}</a></td>
       <td><code>{{ company.domain }}</code></td>
-      <td>{{ company.status }}</td>
+      <td>{{ company.status | status_badge('company') }}</td>
       <td>
         {% if company.icp_score is not none %}
         {{ '%.0f'|format(company.icp_score) }}
-        {% if company.priority %} <span class="band band-{{ company.priority }}">{{ company.priority }}</span>{% endif %}
+        {% if company.priority %} {{ company.priority | priority_badge }}{% endif %}
         {% else %}—{% endif %}
       </td>
       <td>{{ snapshot_counts.get(company.id, 0) }}</td>
-      <td>{{ company.last_researched_at or "—" }}</td>
+      <td>{{ company.last_researched_at | when }}</td>
       <td>
         <form method="post" action="/companies/{{ company.id }}/delete"
-              onsubmit="return confirm('Delete this company and all related data? This cannot be undone.');">
+              data-confirm="Delete this company and all related data? This cannot be undone.">
           <button type="submit" class="outline contrast">Delete</button>
         </form>
       </td>

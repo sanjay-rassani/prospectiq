@@ -115,8 +115,17 @@ def test_playwright_policy_and_missing_dep(session: Session) -> None:
 def test_settings_page(client: object) -> None:
     response = client.get("/settings")  # type: ignore[attr-defined]
     assert response.status_code == 200
-    assert b"Adapters" in response.content
-    assert b"Feeds" in response.content
+    body = response.text
+    assert "Company pipeline adapters" in body
+    assert "Discover sources" in body
+    assert "Target industries" in body
+    assert "Target locations" in body
+    assert "Services / solution families" in body
+    assert "Hacker News" in body
+    assert "Feeds" in body
+    assert 'name="industry_choice"' in body
+    assert 'name="region_choice"' in body
+    assert 'name="service_choice"' in body
 
 
 def test_add_feed_via_ui(client: object, session: Session) -> None:
