@@ -24,6 +24,9 @@ from app.services.discovery.feedback import record_feedback
 from app.services.discovery.playwright_fallback import set_domain_policy
 from app.services.discovery.registry import list_adapters
 from app.services.discovery.rss import add_feed, poll_feed
+from app.services.leads.adapters import list_capabilities
+from app.services.leads.filters import INDUSTRIES, SERVICES
+from app.services.leads.locations import LOCATION_COUNTRIES, LOCATION_REGIONS, LOCATIONS
 from app.services.scoring.profile import (
     DEFAULT_PROFILE_PATH,
     get_operator_profile,
@@ -38,6 +41,25 @@ def get_templates(request: Request) -> Jinja2Templates:
     return request.app.state.templates
 
 
+def _split_csv(value: str) -> list[str]:
+    return [p.strip() for p in value.replace("\n", ",").split(",") if p.strip()]
+
+
+def _dedupe_keep_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for raw in values:
+        key = raw.strip()
+        if not key:
+            continue
+        folded = key.casefold()
+        if folded in seen:
+            continue
+        seen.add(folded)
+        out.append(key)
+    return out
+
+
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, session: SessionDep) -> HTMLResponse:
     templates = get_templates(request)
@@ -48,6 +70,29 @@ def settings_page(request: Request, session: SessionDep) -> HTMLResponse:
     feedback = session.scalars(
         select(OperatorFeedback).order_by(OperatorFeedback.created_at.desc()).limit(20)
     ).all()
+
+    industry_keys = {k.casefold() for k, _ in INDUSTRIES}
+    service_keys = {k.casefold() for k, _ in SERVICES}
+    location_keys = {k.casefold() for k, _ in LOCATIONS}
+
+    selected_industries = {i.casefold() for i in profile.target_industries}
+    selected_excluded = {i.casefold() for i in profile.excluded_industries}
+    selected_services = {s.casefold() for s in profile.preferred_solution_families}
+    selected_regions = {r.casefold() for r in profile.target_regions}
+
+    custom_industries_value = ", ".join(
+        i for i in profile.target_industries if i.casefold() not in industry_keys
+    )
+    custom_excluded_industries_value = ", ".join(
+        i for i in profile.excluded_industries if i.casefold() not in industry_keys
+    )
+    custom_services_value = ", ".join(
+        s for s in profile.preferred_solution_families if s.casefold() not in service_keys
+    )
+    custom_regions_value = ", ".join(
+        r for r in profile.target_regions if r.casefold() not in location_keys
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="settings/index.html",
@@ -56,10 +101,23 @@ def settings_page(request: Request, session: SessionDep) -> HTMLResponse:
             "profile": profile,
             "settings": settings,
             "adapters": list_adapters(),
+            "source_capabilities": list_capabilities(settings),
             "feeds": feeds,
             "policies": policies,
             "feedback": feedback,
             "adapter_kinds": [k.value for k in AdapterKind],
+            "industries": INDUSTRIES,
+            "services": SERVICES,
+            "location_regions": LOCATION_REGIONS,
+            "location_countries": LOCATION_COUNTRIES,
+            "selected_industries": selected_industries,
+            "selected_excluded_industries": selected_excluded,
+            "selected_services": selected_services,
+            "selected_regions": selected_regions,
+            "custom_industries_value": custom_industries_value,
+            "custom_excluded_industries_value": custom_excluded_industries_value,
+            "custom_services_value": custom_services_value,
+            "custom_regions_value": custom_regions_value,
             "flash": request.query_params.get("flash"),
             "profile_path": str(DEFAULT_PROFILE_PATH),
         },
@@ -67,12 +125,9 @@ def settings_page(request: Request, session: SessionDep) -> HTMLResponse:
 
 
 @router.post("/settings/profile")
-def settings_save_profile(
+async def settings_save_profile(
+    request: Request,
     positioning: Annotated[str, Form()] = "",
-    target_industries: Annotated[str, Form()] = "",
-    target_regions: Annotated[str, Form()] = "",
-    excluded_industries: Annotated[str, Form()] = "",
-    preferred_solution_families: Annotated[str, Form()] = "",
     band_high: Annotated[float, Form()] = 75,
     band_medium: Annotated[float, Form()] = 55,
     band_watch: Annotated[float, Form()] = 35,
@@ -85,14 +140,27 @@ def settings_save_profile(
     refresh_nurture: Annotated[int, Form()] = 30,
 ) -> RedirectResponse:
     """Persist operator profile YAML. Model names are documented; runtime uses .env."""
+    form = await request.form()
     data: dict[str, Any] = {}
     if DEFAULT_PROFILE_PATH.exists():
         data = yaml.safe_load(DEFAULT_PROFILE_PATH.read_text()) or {}
     data["positioning"] = positioning.strip() or data.get("positioning", "")
-    data["target_industries"] = _split_csv(target_industries)
-    data["target_regions"] = _split_csv(target_regions)
-    data["excluded_industries"] = _split_csv(excluded_industries)
-    data["preferred_solution_families"] = _split_csv(preferred_solution_families)
+    data["target_industries"] = _dedupe_keep_order(
+        [str(v) for v in form.getlist("industry_choice")]
+        + _split_csv(str(form.get("custom_industries") or ""))
+    )
+    data["target_regions"] = _dedupe_keep_order(
+        [str(v) for v in form.getlist("region_choice")]
+        + _split_csv(str(form.get("custom_regions") or ""))
+    )
+    data["excluded_industries"] = _dedupe_keep_order(
+        [str(v) for v in form.getlist("exclude_industry_choice")]
+        + _split_csv(str(form.get("custom_excluded_industries") or ""))
+    )
+    data["preferred_solution_families"] = _dedupe_keep_order(
+        [str(v) for v in form.getlist("service_choice")]
+        + _split_csv(str(form.get("custom_services") or ""))
+    )
     data["thresholds"] = {
         "band_high": band_high,
         "band_medium": band_medium,
@@ -120,10 +188,6 @@ def settings_save_profile(
     )
     reload_operator_profile()
     return RedirectResponse(url="/settings?flash=Profile saved", status_code=303)
-
-
-def _split_csv(value: str) -> list[str]:
-    return [p.strip() for p in value.replace("\n", ",").split(",") if p.strip()]
 
 
 @router.post("/settings/feeds")

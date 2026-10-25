@@ -37,6 +37,10 @@ def handle_job(session: Session, job: Job) -> str:
         return _handle_check_stale(session, job)
     if job.job_type == JobType.POLL_FEEDS.value:
         return _handle_poll_feeds(session, job)
+    if job.job_type == JobType.DISCOVER_CONTACTS.value:
+        return _handle_discover_contacts(session, job)
+    if job.job_type == JobType.DISCOVER_LEADS.value:
+        return _handle_discover_leads(session, job)
     raise ValueError(f"Unknown job type: {job.job_type}")
 
 
@@ -171,6 +175,50 @@ def _handle_poll_feeds(session: Session, job: Job) -> str:
         f"feeds={stats['feeds']} new={stats['new_entries']} "
         f"seeded={stats['seeded']} errors={stats['errors']}"
     )
+
+
+def _handle_discover_contacts(session: Session, job: Job) -> str:
+    from app.services.contacts.discover import discover_contacts_for_company
+    from app.services.contacts.scan_history import (
+        attach_outcome_to_job,
+        friendly_success_outcome,
+    )
+
+    if job.entity_id is None:
+        raise ValueError("discover_contacts requires entity_id (company id)")
+    payload = job.payload_json or {}
+    # Preserve max_urls=0 (snapshot-only). `or 12` would wrongly treat 0 as missing.
+    raw_max = payload.get("max_urls", 12)
+    max_urls = 12 if raw_max is None else int(raw_max)
+    result = discover_contacts_for_company(
+        session,
+        job.entity_id,
+        max_urls=max_urls,
+        refresh=bool(payload.get("refresh")),
+    )
+    # Missing about/team pages is a normal empty result, not a hard job failure.
+    outcome = friendly_success_outcome(result)
+    attach_outcome_to_job(job, outcome, result=result)
+    return outcome
+
+
+def _handle_discover_leads(session: Session, job: Job) -> str:
+    from app.services.leads.engine import run_lead_discovery
+    from app.services.leads.filters import filters_from_prefs
+    from app.services.leads.run_history import attach_discovery_outcome
+    from app.services.scoring.profile import get_operator_profile
+
+    profile = get_operator_profile()
+    filters = filters_from_prefs(profile.discovery, profile)
+    stats = run_lead_discovery(session, filters)
+    summary = (
+        f"leads +{stats.created} updated={stats.updated} "
+        f"seeded={stats.seeded} errors={len(stats.errors)}"
+    )
+    attach_discovery_outcome(
+        session, job, stats=stats.as_dict(), summary=summary
+    )
+    return summary
 
 
 def ensure_maintenance_jobs(session: Session) -> None:

@@ -164,7 +164,10 @@ def start_outreach(
     session: SessionDep,
     opportunity_id: UUID,
     channel: Annotated[str, Form()] = "linkedin",
+    person_id: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
+    from app.models import Person
+
     opportunity = session.scalar(
         select(Opportunity)
         .where(Opportunity.id == opportunity_id)
@@ -173,13 +176,44 @@ def start_outreach(
     if opportunity is None:
         return RedirectResponse(url="/outreach?flash=Opportunity not found", status_code=303)
     company = opportunity.company
+    person = None
+    if person_id.strip():
+        try:
+            pid = UUID(person_id.strip())
+        except ValueError:
+            return RedirectResponse(
+                url=f"/opportunities/{opportunity_id}?flash=Invalid contact",
+                status_code=303,
+            )
+        person = session.get(Person, pid)
+        if person is None or person.company_id != company.id:
+            return RedirectResponse(
+                url=f"/opportunities/{opportunity_id}?flash=Contact not found for this company",
+                status_code=303,
+            )
+        if channel == "email" and not person.public_email:
+            return RedirectResponse(
+                url=(
+                    f"/opportunities/{opportunity_id}"
+                    "?flash=Selected contact has no public email — pick another or use LinkedIn"
+                ),
+                status_code=303,
+            )
+        if channel == "linkedin" and not person.public_profile_url:
+            # Allow brief without URL — operator may paste after research.
+            pass
     gateway = None
     if get_settings().llm_enabled:
         gateway = OllamaGateway()
     try:
         try:
             task = create_outreach_task(
-                session, opportunity, company, channel=channel, gateway=gateway
+                session,
+                opportunity,
+                company,
+                channel=channel,
+                person=person,
+                gateway=gateway,
             )
         finally:
             if gateway is not None:

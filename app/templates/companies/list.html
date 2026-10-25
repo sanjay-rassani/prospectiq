@@ -5,18 +5,12 @@
 <header class="row">
   <div>
     <h1>Companies</h1>
-    <p>Seeded and monitored companies. Deduplicated by normalized domain.</p>
   </div>
   <div class="actions">
-    <a href="/companies/seed" role="button">Seed</a>
-    <a href="/companies/discover" role="button" class="secondary">Discover</a>
+    <a href="/companies/discover" role="button">Discover</a>
+    <a href="/companies/seed" role="button" class="secondary">Seed</a>
   </div>
 </header>
-
-<p class="tip">
-  <strong>Tip:</strong> <em>Seed</em> = you paste domains. <em>Discover</em> = feeds bring candidates in.
-  Open a company to review facts, signals, and opportunities before outreach.
-</p>
 
 {% if flash %}
 <p><mark>{{ flash }}</mark></p>
@@ -40,18 +34,18 @@
     <tr>
       <td><a href="/companies/{{ company.id }}">{{ company.name }}</a></td>
       <td><code>{{ company.domain }}</code></td>
-      <td>{{ company.status }}</td>
+      <td>{{ company.status | status_badge('company') }}</td>
       <td>
         {% if company.icp_score is not none %}
         {{ '%.0f'|format(company.icp_score) }}
-        {% if company.priority %} <span class="band band-{{ company.priority }}">{{ company.priority }}</span>{% endif %}
+        {% if company.priority %} {{ company.priority | priority_badge }}{% endif %}
         {% else %}—{% endif %}
       </td>
       <td>{{ snapshot_counts.get(company.id, 0) }}</td>
-      <td>{{ company.last_researched_at or "—" }}</td>
+      <td>{{ company.last_researched_at | when }}</td>
       <td>
         <form method="post" action="/companies/{{ company.id }}/delete"
-              onsubmit="return confirm('Delete this company and all related data? This cannot be undone.');">
+              data-confirm="Delete this company and all related data? This cannot be undone.">
           <button type="submit" class="outline contrast">Delete</button>
         </form>
       </td>
@@ -60,12 +54,6 @@
   </tbody>
 </table>
 {% else %}
-<article>
-  <p>
-    No companies yet.
-    <a href="/companies/seed">Seed a domain</a>
-    or <a href="/companies/discover">discover from feeds</a>.
-  </p>
-</article>
+<p class="muted">No companies yet. <a href="/companies/discover">Discover</a> or <a href="/companies/seed">seed a URL</a>.</p>
 {% endif %}
 {% endblock %}

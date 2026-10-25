@@ -50,13 +50,13 @@ ADAPTER_REGISTRY: dict[str, AdapterSpec] = {
     # Free-only policy (D-26): no paid search APIs; no Google/LinkedIn scrape or login bots.
     "web_search": AdapterSpec(
         kind="web_search",
-        label="Web search (not wired)",
+        label="Discover lead sources",
         description=(
-            "Reserved. Free path = RSS/feeds, manual seed, or a self-hosted free engine "
-            "(e.g. SearXNG) you run yourself — never paid SerpAPIs, never scrape Google/"
-            "LinkedIn, never store platform passwords."
+            "Filter-driven discovery on Discover: Hacker News, UK Contracts Finder, "
+            "GitHub issues, RSS, optional SearXNG (+ engine picker), and custom feeds. "
+            "Configure sources on Discover — never paid search APIs, never scrape marketplaces."
         ),
-        enabled_by_default=False,
+        enabled_by_default=True,
     ),
 }
 

@@ -61,6 +61,16 @@ class Settings(BaseSettings):
 
     log_level: str = Field(default="INFO")
 
+    # Optional SearXNG JSON API (local docker compose recommended).
+    searxng_url: str = ""
+    # Extra instance bases (comma-separated), e.g. copies from https://searx.space/
+    searxng_extra_urls: str = ""
+    # Also try healthy public instances listed on searx.space (often block bots).
+    searxng_use_public_directory: bool = True
+    searxng_public_max_instances: int = 3
+    # Optional GitHub token raises unauthenticated search rate limits.
+    github_token: str = ""
+
     def _dsn(self, database: str) -> str:
         return str(
             PostgresDsn.build(

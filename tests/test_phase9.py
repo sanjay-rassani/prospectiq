@@ -26,10 +26,12 @@ def test_adapter_registry() -> None:
     kinds = {a.kind for a in adapters}
     assert AdapterKind.RSS.value in kinds
     assert AdapterKind.GITHUB_RELEASES.value in kinds
-    assert "web_search" in kinds  # documented extension; not wired
+    assert "web_search" in kinds
     assert get_adapter("rss") is not None
-    assert get_adapter("web_search") is not None
-    assert get_adapter("web_search") and not get_adapter("web_search").enabled_by_default
+    web = get_adapter("web_search")
+    assert web is not None
+    assert web.enabled_by_default
+    assert "SearXNG" in web.description or "Hacker News" in web.description
 
 
 def test_add_and_poll_rss_feed(session: Session, monkeypatch: object) -> None:
@@ -113,8 +115,17 @@ def test_playwright_policy_and_missing_dep(session: Session) -> None:
 def test_settings_page(client: object) -> None:
     response = client.get("/settings")  # type: ignore[attr-defined]
     assert response.status_code == 200
-    assert b"Adapters" in response.content
-    assert b"Feeds" in response.content
+    body = response.text
+    assert "Company pipeline adapters" in body
+    assert "Discover sources" in body
+    assert "Target industries" in body
+    assert "Target locations" in body
+    assert "Services / solution families" in body
+    assert "Hacker News" in body
+    assert "Feeds" in body
+    assert 'name="industry_choice"' in body
+    assert 'name="region_choice"' in body
+    assert 'name="service_choice"' in body
 
 
 def test_add_feed_via_ui(client: object, session: Session) -> None:

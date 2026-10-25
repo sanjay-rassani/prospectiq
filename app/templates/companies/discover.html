@@ -5,10 +5,10 @@
 <header class="row">
   <div>
     <h1>Discover</h1>
-    <p>Find companies from public feeds — one step at a time.</p>
+    <p>Find leads. Save filters, run, review results.</p>
   </div>
   <div class="actions">
-    <a href="/companies/seed" role="button" class="secondary outline">Manual seed</a>
+    <a href="/companies/seed" role="button" class="secondary outline">Seed URL</a>
   </div>
 </header>
 
@@ -16,176 +16,344 @@
 <p><mark>{{ flash }}</mark></p>
 {% endif %}
 
-<p class="tip">
-  <strong>Free only.</strong> Public RSS/Atom/GitHub feeds + manual seed — no paid search APIs,
-  no Google/LinkedIn login bots.
-</p>
+<div class="discover-layout">
+  <aside class="discover-filters">
+    <form method="post" action="/companies/discover/prefs" id="discover-prefs-form">
+      {# Who targeting lives in a popup; fields stay in this form for Run/Save. #}
+      <div id="who-modal" class="who-modal" hidden>
+        <div class="who-modal-backdrop" data-who-close tabindex="-1"></div>
+        <div class="who-modal-panel" role="dialog" aria-modal="true" aria-labelledby="who-modal-title">
+          <header class="row">
+            <div>
+              <h2 id="who-modal-title">Who</h2>
+              <p class="muted" style="margin:0.15rem 0 0"><small>Choose who you want to find. Applies on Save or Run discovery.</small></p>
+            </div>
+            <div class="actions">
+              <button type="button" class="contrast" data-who-close>Done</button>
+            </div>
+          </header>
+          <div class="who-modal-body">
 
-<nav class="stepper" aria-label="Discover steps">
-  <ol class="stepper-list">
-    <li><button type="button" class="stepper-btn" data-goto="1" aria-current="step"><span class="step-num">1</span> Who</button></li>
-    <li><button type="button" class="stepper-btn" data-goto="2"><span class="step-num">2</span> Polling</button></li>
-    <li><button type="button" class="stepper-btn" data-goto="3"><span class="step-num">3</span> Feeds</button></li>
-    <li><button type="button" class="stepper-btn" data-goto="4"><span class="step-num">4</span> Live activity</button></li>
-    <li><button type="button" class="stepper-btn" data-goto="5"><span class="step-num">5</span> Results</button></li>
-  </ol>
-</nav>
+          <fieldset class="choice-fieldset compact">
+            <legend>Preset</legend>
+            <div class="choice-grid">
+              {% for key, label in preset_choices %}
+              <label class="checkbox-option">
+                <input type="radio" name="focus_preset" value="{{ key }}" id="focus-preset-{{ key }}"
+                  {% if discovery.focus_preset == key %}checked{% endif %}>
+                {{ label }}
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
 
-{# Steps 1–2 share one prefs form so hidden panels still submit. #}
-<form method="post" action="/companies/discover/prefs" id="discover-prefs-form">
+          <fieldset class="choice-fieldset compact">
+            <legend>Type</legend>
+            <div class="choice-grid">
+              {% for key, label in lead_types %}
+              <label class="checkbox-option">
+                <input type="checkbox" name="lead_type" value="{{ key }}"
+                  {% if key.casefold() in selected_lead_types %}checked{% endif %}>
+                {{ label }}
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
 
-<section class="step-panel" data-step="1" id="step-1">
-  <article>
-    <header><strong>Step 1 — Who to discover</strong></header>
-    <p class="tip">
-      Pick a focus, then tick topics to include or exclude. These filter feed items
-      <em>before</em> seeding. ICP Fit still uses your full <a href="/settings">Settings</a> profile later.
-    </p>
-    <label>Focus preset
-      <select name="focus_preset" id="focus-preset">
-        {% for key, label in preset_choices %}
-        <option value="{{ key }}" {% if discovery.focus_preset == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <p class="tip"><strong>Tip:</strong> A preset ticks the boxes below. Change them, then continue to Polling and Save.</p>
+          <fieldset class="choice-fieldset compact">
+            <legend>Services</legend>
+            <div class="choice-grid">
+              {% for key, label in services %}
+              <label class="checkbox-option">
+                <input type="checkbox" name="service_choice" value="{{ key }}"
+                  {% if key.casefold() in selected_services %}checked{% endif %}>
+                {{ label }}
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
 
-    <fieldset class="choice-fieldset">
-      <legend>Include topics <small>(match at least one if any selected)</small></legend>
-      {% for group_name, items in keyword_groups.items() %}
-      <p class="choice-group-label">{{ group_name }}</p>
-      <div class="choice-grid">
-        {% for item in items %}
-        <label class="choice-chip">
-          <input type="checkbox" name="keyword_choice" value="{{ item }}"
-            class="kw-choice"
-            {% if item.casefold() in selected_keywords %}checked{% endif %}>
-          {{ item }}
-        </label>
-        {% endfor %}
+          <fieldset class="choice-fieldset compact">
+            <legend>Industries</legend>
+            <div class="choice-grid">
+              {% for key, label in industries %}
+              <label class="checkbox-option">
+                <input type="checkbox" name="industry_choice" value="{{ key }}"
+                  {% if key.casefold() in selected_industries %}checked{% endif %}>
+                {{ label }}
+              </label>
+              {% endfor %}
+            </div>
+            <fieldset class="choice-fieldset compact">
+              <legend>Match</legend>
+              <div class="choice-grid">
+                <label class="checkbox-option">
+                  <input type="radio" name="industry_mode" value="flexible"
+                    {% if discovery.industry_mode != 'strict' %}checked{% endif %}>
+                  Flexible
+                </label>
+                <label class="checkbox-option">
+                  <input type="radio" name="industry_mode" value="strict"
+                    {% if discovery.industry_mode == 'strict' %}checked{% endif %}>
+                  Strict
+                </label>
+              </div>
+            </fieldset>
+          </fieldset>
+
+          <fieldset class="choice-fieldset compact">
+            <legend>Locations</legend>
+            <p class="muted"><small>
+              Hold Ctrl (Windows/Linux) or Cmd (Mac) to select multiple countries.
+            </small></p>
+            <label>Countries
+              <select name="location_choice" multiple size="12" class="location-select">
+                <optgroup label="Regions">
+                  {% for key, label in location_regions %}
+                  <option value="{{ key }}"
+                    {% if key.casefold() in selected_locations %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </optgroup>
+                <optgroup label="Countries">
+                  {% for key, label in location_countries %}
+                  <option value="{{ key }}"
+                    {% if key.casefold() in selected_locations %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </optgroup>
+              </select>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="include_remote" value="on"
+                {% if discovery.include_remote %}checked{% endif %}>
+              Allow remote / unknown location
+            </label>
+          </fieldset>
+          <label>Must include
+            <input type="text" name="required_keywords" value="{{ discovery.required_keywords | join(', ') }}"
+              placeholder="automation, CRM">
+          </label>
+          <label>Min score
+            <input type="number" name="min_relevance" min="0" max="100" value="{{ discovery.min_relevance }}">
+          </label>
+          <label>Freshness
+            <select name="max_age_days">
+              {% set age = discovery.max_age_days if discovery.max_age_days is not none else 90 %}
+              <option value="7" {% if age == 7 %}selected{% endif %}>Last 7 days</option>
+              <option value="30" {% if age == 30 %}selected{% endif %}>Last 30 days</option>
+              <option value="90" {% if age == 90 %}selected{% endif %}>Last 90 days</option>
+              <option value="365" {% if age == 365 %}selected{% endif %}>Last year</option>
+              <option value="0" {% if age == 0 %}selected{% endif %}>Any age</option>
+            </select>
+          </label>
+
+          <details class="more-filters">
+            <summary>More filters</summary>
+            <div class="grid">
+              <label>Budget min
+                <input type="number" name="budget_min" step="1" value="{{ discovery.budget_min or '' }}">
+              </label>
+              <label>Budget max
+                <input type="number" name="budget_max" step="1" value="{{ discovery.budget_max or '' }}">
+              </label>
+              <label>Currency
+                <input type="text" name="budget_currency" value="{{ discovery.budget_currency or '' }}" placeholder="GBP">
+              </label>
+            </div>
+
+            <fieldset class="choice-fieldset compact">
+              <legend>Keywords</legend>
+              {% for group_name, items in keyword_groups.items() %}
+              <p class="choice-group-label">{{ group_name }}</p>
+              <div class="choice-grid">
+                {% for item in items %}
+                <label class="checkbox-option">
+                  <input type="checkbox" name="keyword_choice" value="{{ item }}"
+                    class="kw-choice"
+                    {% if item.casefold() in selected_keywords %}checked{% endif %}>
+                  {{ item }}
+                </label>
+                {% endfor %}
+              </div>
+              {% endfor %}
+              <label>Extra
+                <input type="text" name="custom_keywords" id="custom-keywords"
+                  value="{{ custom_keywords_value }}" placeholder="fleet, ERP">
+              </label>
+            </fieldset>
+
+            <fieldset class="choice-fieldset compact">
+              <legend>Exclude</legend>
+              {% for group_name, items in exclude_groups.items() %}
+              <p class="choice-group-label">{{ group_name }}</p>
+              <div class="choice-grid">
+                {% for item in items %}
+                <label class="checkbox-option">
+                  <input type="checkbox" name="exclude_choice" value="{{ item }}"
+                    class="ex-choice"
+                    {% if item.casefold() in selected_excludes %}checked{% endif %}>
+                  {{ item }}
+                </label>
+                {% endfor %}
+              </div>
+              {% endfor %}
+              <label>Extra
+                <input type="text" name="custom_excludes" id="custom-excludes"
+                  value="{{ custom_excludes_value }}" placeholder="internship">
+              </label>
+            </fieldset>
+
+            <label class="checkbox-option">
+              <input type="checkbox" name="use_profile_industries_as_keywords" value="on" id="use-industries"
+                {% if discovery.use_profile_industries_as_keywords %}checked{% endif %}>
+              Use Settings industries
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="skip_social_hosts" value="on"
+                {% if discovery.skip_social_hosts %}checked{% endif %}>
+              Skip social links
+            </label>
+          </details>
+          </div>
+        </div>
       </div>
-      {% endfor %}
-      <label>Extra keywords (optional, comma-separated)
-        <input type="text" name="custom_keywords" id="custom-keywords"
-          value="{{ custom_keywords_value }}"
-          placeholder="e.g. cold chain, ERP, fleet">
-      </label>
-    </fieldset>
 
-    <fieldset class="choice-fieldset">
-      <legend>Exclude topics</legend>
-      {% for group_name, items in exclude_groups.items() %}
-      <p class="choice-group-label">{{ group_name }}</p>
-      <div class="choice-grid">
-        {% for item in items %}
-        <label class="choice-chip">
-          <input type="checkbox" name="exclude_choice" value="{{ item }}"
-            class="ex-choice"
-            {% if item.casefold() in selected_excludes %}checked{% endif %}>
-          {{ item }}
+      <article>
+        <header><strong>Sources</strong></header>
+        <p class="muted"><small>
+          Only permitted public / self-hosted sources. Marketplaces (Upwork, Fiverr, LinkedIn)
+          are not scraped — paste a URL via Seed if you found something manually.
+        </small></p>
+        <ul class="source-list">
+          {% for cap in source_capabilities %}
+          <li>
+            <label class="checkbox-option">
+              <input type="checkbox" name="source_choice" value="{{ cap.key }}"
+                {% if cap.key.casefold() in selected_sources %}checked{% endif %}>
+              {{ cap.label }}
+            </label>
+            {% if cap.availability == 'optional_config' %}
+            <span class="band band-watch" title="{{ cap.requires_config or 'Needs setup' }}">setup</span>
+            {% else %}
+            <span class="band band-high">ready</span>
+            {% endif %}
+            {% if cap.description %}<br><small class="muted">{{ cap.description }}</small>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+
+        <fieldset class="choice-fieldset compact">
+          <legend>Search engines (via SearXNG)</legend>
+          <p class="muted"><small>
+            Used when <strong>SearXNG</strong> is enabled. Prefers local <code>SEARXNG_URL</code>,
+            then optional public instances from
+            <a href="https://searx.space/" target="_blank" rel="noopener">searx.space</a>
+            (directory of community SearXNG servers — many block bots; local is more reliable).
+            Never scrapes Google/Bing HTML itself.
+          </small></p>
+          <div class="choice-grid">
+            {% for key, label in search_engines %}
+            <label class="checkbox-option">
+              <input type="checkbox" name="engine_choice" value="{{ key }}"
+                {% if key.casefold() in selected_engines %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </div>
+          <label class="checkbox-option">
+            <input type="checkbox" name="use_public_searxng" value="on"
+              {% if discovery.use_public_searxng %}checked{% endif %}>
+            Also try public SearXNG instances (searx.space directory)
+          </label>
+        </fieldset>
+
+        <fieldset class="choice-fieldset compact">
+          <legend>Your custom sources</legend>
+          <p class="muted"><small>Add public RSS/Atom feeds (job boards, changelogs, partner blogs).</small></p>
+          {% if custom_sources %}
+          <ul class="source-list">
+            {% for src in custom_sources %}
+            <li>
+              <label class="checkbox-option">
+                <input type="checkbox" name="remove_custom_source" value="{{ src.url }}">
+                Remove
+              </label>
+              <strong>{{ src.name }}</strong>
+              <small class="muted">· {{ src.kind or 'rss' }}</small><br>
+              <small><a href="{{ src.url }}" target="_blank" rel="noopener">{{ src.url }}</a></small>
+              <input type="hidden" name="existing_custom_name" value="{{ src.name }}">
+              <input type="hidden" name="existing_custom_url" value="{{ src.url }}">
+              <input type="hidden" name="existing_custom_kind" value="{{ src.kind or 'rss' }}">
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          <div class="grid">
+            <label>Name
+              <input type="text" name="new_custom_name" placeholder="Niche board feed">
+            </label>
+            <label>Kind
+              <select name="new_custom_kind">
+                <option value="rss">RSS</option>
+                <option value="atom">Atom</option>
+              </select>
+            </label>
+          </div>
+          <label>Feed URL
+            <input type="url" name="new_custom_url" placeholder="https://example.com/feed.xml">
+          </label>
+        </fieldset>
+
+        <label class="checkbox-option">
+          <input type="checkbox" name="prefer_high_intent" value="on"
+            {% if discovery.prefer_high_intent %}checked{% endif %}>
+          Prefer buying intent
         </label>
-        {% endfor %}
-      </div>
-      {% endfor %}
-      <label>Extra excludes (optional, comma-separated)
-        <input type="text" name="custom_excludes" id="custom-excludes"
-          value="{{ custom_excludes_value }}"
-          placeholder="e.g. internship, layoff">
-      </label>
-    </fieldset>
+        <div class="grid">
+          <label>Max / source
+            <input type="number" name="max_new_entries_per_feed" min="1" max="200"
+              value="{{ discovery.max_new_entries_per_feed }}">
+          </label>
+          <label>Max seed
+            <input type="number" name="max_seeds_per_poll" min="0" max="100"
+              value="{{ discovery.max_seeds_per_poll }}">
+          </label>
+        </div>
+        <label class="checkbox-option">
+          <input type="checkbox" name="seed_new_links" value="on"
+            {% if discovery.seed_new_links %}checked{% endif %}>
+          Auto-save company domains
+        </label>
+        <label class="checkbox-option">
+          <input type="checkbox" name="only_unknown_domains" value="on"
+            {% if discovery.only_unknown_domains %}checked{% endif %}>
+          Skip known domains
+        </label>
+        <button type="submit">Save filters</button>
+        <p class="muted"><small>
+          <strong>Run discovery</strong> also saves these filters first, then applies them.
+        </small></p>
+      </article>
+    </form>
 
-    <label>
-      <input type="checkbox" name="use_profile_industries_as_keywords" value="on" id="use-industries"
-        {% if discovery.use_profile_industries_as_keywords %}checked{% endif %}>
-      Also match Settings target industries
-      {% if profile.target_industries %}
-      (<code>{{ profile.target_industries[:8] | join(', ') }}{% if profile.target_industries|length > 8 %}…{% endif %}</code>)
+    <details class="more-filters">
+      <summary>RSS feeds ({{ feeds | length }})</summary>
+      {% if feeds %}
+      <table>
+        <thead><tr><th>Name</th><th>On</th></tr></thead>
+        <tbody>
+          {% for feed in feeds %}
+          <tr>
+            <td>{{ feed.name }}</td>
+            <td>{{ "yes" if feed.enabled else "no" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
       {% endif %}
-    </label>
-    <label>
-      <input type="checkbox" name="skip_social_hosts" value="on"
-        {% if discovery.skip_social_hosts %}checked{% endif %}>
-      Skip LinkedIn / Twitter / social links (recommended)
-    </label>
-
-    <div class="stepper-nav">
-      <span></span>
-      <button type="button" class="outline" data-goto="2">Next: Polling →</button>
-    </div>
-  </article>
-</section>
-
-<section class="step-panel" data-step="2" id="step-2" hidden>
-  <article>
-    <header><strong>Step 2 — Polling behavior</strong></header>
-    <p class="tip">How hard each <em>Run discovery</em> pass works. Activity logs are live only — not saved to the database.</p>
-    <div class="grid">
-      <label>Max new entries per feed
-        <input type="number" name="max_new_entries_per_feed" min="1" max="200"
-          value="{{ discovery.max_new_entries_per_feed }}">
-      </label>
-      <label>Max companies to seed per run
-        <input type="number" name="max_seeds_per_poll" min="0" max="100"
-          value="{{ discovery.max_seeds_per_poll }}">
-      </label>
-    </div>
-    <label>
-      <input type="checkbox" name="seed_new_links" value="on"
-        {% if discovery.seed_new_links %}checked{% endif %}>
-      Seed matching links into Companies (same pipeline as manual seed)
-    </label>
-    <label>
-      <input type="checkbox" name="only_unknown_domains" value="on"
-        {% if discovery.only_unknown_domains %}checked{% endif %}>
-      Skip domains already in Companies
-    </label>
-    <button type="submit">Save filters &amp; behavior</button>
-    <div class="stepper-nav">
-      <button type="button" class="secondary outline" data-goto="1">← Who</button>
-      <button type="button" class="outline" data-goto="3">Next: Feeds →</button>
-    </div>
-  </article>
-</section>
-
-</form>
-
-<section class="step-panel" data-step="3" id="step-3" hidden>
-  <article>
-    <header><strong>Step 3 — Feeds (sources)</strong></header>
-    <p class="tip">
-      <strong>Free sources only.</strong> Add RSS/Atom, GitHub <code>releases.atom</code>, or changelog feeds.
-      This is your discovery surface — not a paid Google API.
-    </p>
-    {% if feeds %}
-    <table>
-      <thead>
-        <tr><th>Name</th><th>Kind</th><th>URL</th><th>Enabled</th><th>Last fetch</th></tr>
-      </thead>
-      <tbody>
-        {% for feed in feeds %}
-        <tr>
-          <td>{{ feed.name }}</td>
-          <td>{{ feed.kind }}</td>
-          <td><code>{{ feed.url }}</code></td>
-          <td>{{ "yes" if feed.enabled else "no" }}</td>
-          <td>{{ feed.last_fetched_at or "—" }}</td>
-        </tr>
-        {% if feed.last_error %}
-        <tr><td colspan="5"><small>{{ feed.last_error }}</small></td></tr>
-        {% endif %}
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p>No feeds yet. Add one below.</p>
-    {% endif %}
-
-    <form method="post" action="/companies/discover/feeds" id="add-feed-form">
-      <fieldset>
-        <legend>Add feed</legend>
-        <label>Suggested free feed
-          <select id="feed-suggestion" aria-describedby="feed-suggestion-help">
-            <option value="">Custom — type name &amp; URL below</option>
+      <form method="post" action="/companies/discover/feeds" id="add-feed-form">
+        <label>Suggested
+          <select id="feed-suggestion">
+            <option value="">Custom</option>
             {% for group_name, items in feed_suggestion_groups.items() %}
             <optgroup label="{{ group_name }}">
               {% for item in items %}
@@ -195,11 +363,8 @@
             {% endfor %}
           </select>
         </label>
-        <p class="tip" id="feed-suggestion-help">
-          Pick a suggestion to fill Name / URL / Kind, or leave Custom and enter your own.
-        </p>
-        <label>Name <input type="text" name="name" id="feed-name" required placeholder="Industry news"></label>
-        <label>URL <input type="url" name="url" id="feed-url" required placeholder="https://example.com/feed.xml"></label>
+        <label>Name <input type="text" name="name" id="feed-name" required></label>
+        <label>URL <input type="url" name="url" id="feed-url" required></label>
         <label>Kind
           <select name="kind" id="feed-kind">
             <option value="rss">rss</option>
@@ -208,108 +373,247 @@
           </select>
         </label>
         <button type="submit">Add feed</button>
-      </fieldset>
-    </form>
-    <p><small>Enable/disable feeds under <a href="/settings">Settings</a>.</small></p>
-    <div class="stepper-nav">
-      <button type="button" class="secondary outline" data-goto="2">← Polling</button>
-      <button type="button" class="outline" data-goto="4">Next: Live activity →</button>
-    </div>
-  </article>
-</section>
+      </form>
+    </details>
+  </aside>
 
-<section class="step-panel" data-step="4" id="step-4" hidden>
-  <article id="activity-panel">
-    <header><strong>Step 4 — Live activity</strong></header>
-    <p class="tip" id="activity-hint">
-      This panel is separate so you can watch the run without scrolling past filters.
-      Logs are <strong>not stored</strong> — stay on this step while discovery runs.
-    </p>
-    <div class="actions" style="margin-bottom:0.75rem">
-      <button type="button" id="poll-feeds-btn">Run discovery</button>
-    </div>
-    <pre id="activity-log" class="terminal-log" aria-live="polite"></pre>
-    <div class="stepper-nav">
-      <button type="button" class="secondary outline" data-goto="3">← Feeds</button>
-      <button type="button" class="outline" data-goto="5">Next: Results →</button>
-    </div>
-  </article>
-</section>
+  <div class="discover-main">
+    <article id="activity-panel">
+      <header class="row">
+        <strong>Run</strong>
+        <div class="actions">
+          <button type="button" class="outline" id="who-open-btn"
+            aria-haspopup="dialog" aria-controls="who-modal">Who…</button>
+          <button type="button" id="poll-feeds-btn">Run discovery</button>
+        </div>
+      </header>
+      <p class="who-summary" id="who-summary" aria-live="polite"></p>
+      <pre id="activity-log" class="terminal-log" aria-live="polite"></pre>
+      {% if discovery_runs %}
+        {% if discovery_runs|length == 1 %}
+        {% set run = discovery_runs[0] %}
+        <details class="discovery-history">
+          <summary>Discovery history (1)</summary>
+          <ul>
+            <li>
+              <details class="discovery-run" open>
+                <summary>
+                  {{ run.at | when }}
+                  <span class="{% if run.ok %}scan-ok{% else %}scan-fail{% endif %}">{{ run.outcome }}</span>
+                </summary>
+                {% if run.log_lines %}
+                <pre class="discovery-run-log">{{ run.log_lines | join('\n') }}</pre>
+                {% else %}
+                <p class="muted"><small>No detailed log stored for this run.</small></p>
+                {% endif %}
+              </details>
+            </li>
+          </ul>
+        </details>
+        {% else %}
+        <p class="discovery-history-trigger">
+          <button type="button" class="linkish" id="discovery-history-open"
+            aria-haspopup="dialog" aria-controls="discovery-history-modal">
+            Discovery history ({{ discovery_runs|length }})
+          </button>
+        </p>
+        <div id="discovery-history-modal" class="discovery-history-modal" hidden>
+          <div class="discovery-history-backdrop" data-discovery-history-close tabindex="-1"></div>
+          <div class="discovery-history-panel" role="dialog" aria-modal="true"
+            aria-labelledby="discovery-history-title">
+            <header class="row">
+              <h2 id="discovery-history-title">Discovery history</h2>
+              <button type="button" class="outline" data-discovery-history-close>Close</button>
+            </header>
+            <p class="muted"><small>{{ discovery_runs|length }} recent runs. Expand one to see its log.</small></p>
+            <ul class="discovery-history-list">
+              {% for run in discovery_runs %}
+              <li>
+                <details class="discovery-run">
+                  <summary>
+                    {{ run.at | when }}
+                    <span class="{% if run.ok %}scan-ok{% else %}scan-fail{% endif %}">{{ run.outcome }}</span>
+                  </summary>
+                  {% if run.log_lines %}
+                  <pre class="discovery-run-log">{{ run.log_lines | join('\n') }}</pre>
+                  {% else %}
+                  <p class="muted"><small>No detailed log stored for this run.</small></p>
+                  {% endif %}
+                </details>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        {% endif %}
+      {% else %}
+      <p class="muted discovery-history-empty"><small>No discovery runs yet. Click Run discovery to start.</small></p>
+      {% endif %}
+    </article>
 
-<section class="step-panel" data-step="5" id="step-5" hidden>
-  <article>
-    <header><strong>Step 5 — Results</strong></header>
-    <p class="tip">Companies seeded from matching feed links. Open one to review facts and opportunities.</p>
-    {% if recent %}
-    <table>
-      <thead>
-        <tr><th>Company</th><th>From feed</th><th>Entry</th><th>When</th></tr>
-      </thead>
-      <tbody>
-        {% for entry, company, feed in recent %}
-        <tr>
-          <td><a href="/companies/{{ company.id }}">{{ company.name }}</a> <code>{{ company.domain }}</code></td>
-          <td>{{ feed.name }}</td>
-          <td>
-            {% if entry.title %}{{ entry.title }}{% else %}<code>{{ entry.link }}</code>{% endif %}
-          </td>
-          <td>{{ entry.created_at }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p>Nothing discovered yet. Finish steps 1–3, then run discovery on step 4 — or <a href="/companies/seed">seed manually</a>.</p>
-    {% endif %}
-    <div class="stepper-nav">
-      <button type="button" class="secondary outline" data-goto="4">← Live activity</button>
-      <a href="/companies" role="button" class="outline">All companies</a>
-    </div>
-  </article>
-</section>
+    <article>
+      <header class="row">
+        <div>
+          <strong>Results</strong>
+          <small class="muted">
+            {{ lead_counts.get('new', 0) }} new ·
+            {{ lead_counts.get('qualified', 0) }} qualified ·
+            {{ lead_counts.get('saved', 0) }} saved ·
+            {{ lead_counts.get('rejected', 0) }} rejected
+          </small>
+        </div>
+      </header>
+      <form method="get" action="/companies/discover" class="inline-filters">
+        <select name="intent">
+          <option value="">All intent</option>
+          {% for v, label in [
+            ('high_intent', 'High intent'),
+            ('potential_company', 'Potential'),
+            ('emerging', 'Emerging'),
+            ('low_relevance', 'Low')
+          ] %}
+          <option value="{{ v }}" {% if intent_filter == v %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select name="lead_status">
+          <option value="" {% if not status_filter %}selected{% endif %}>Active (hide rejected)</option>
+          <option value="new" {% if status_filter == 'new' %}selected{% endif %}>New</option>
+          <option value="qualified" {% if status_filter == 'qualified' %}selected{% endif %}>Qualified</option>
+          <option value="saved" {% if status_filter == 'saved' %}selected{% endif %}>Saved</option>
+          <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected only</option>
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All statuses</option>
+        </select>
+        <button type="submit" class="outline">Filter</button>
+      </form>
+
+      {% if leads %}
+      <form method="post" action="/leads/bulk" id="leads-bulk-form">
+        <div class="bulk-bar" id="leads-bulk-bar">
+          <label class="checkbox-option bulk-select-all">
+            <input type="checkbox" id="leads-select-all" title="Select all leads on this page">
+            Select all
+          </label>
+          <span class="muted" id="leads-selected-count">0 selected</span>
+          <div class="bulk-actions">
+            <button type="submit" name="action" value="qualify" class="outline" disabled
+              data-bulk-action>OK</button>
+            <button type="submit" name="action" value="save" class="outline" disabled
+              data-bulk-action>Save</button>
+            <button type="submit" name="action" value="reject" class="outline contrast" disabled
+              data-bulk-action
+              data-confirm="Reject the selected leads?">Reject</button>
+          </div>
+        </div>
+      </form>
+      <table class="leads-table">
+        <thead>
+          <tr>
+            <th class="col-check"></th>
+            <th>Lead</th>
+            <th>Intent</th>
+            <th>Score</th>
+            <th>Source</th>
+            <th>Contact</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lead in leads %}
+          {% set cinfo = lead_contacts.get(lead.company_id|string) if lead.company_id else none %}
+          <tr>
+            <td class="col-check">
+              {% if lead.status != 'rejected' %}
+              <input type="checkbox" form="leads-bulk-form" name="lead_id" value="{{ lead.id }}"
+                class="lead-check">
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ lead.canonical_url }}" target="_blank" rel="noopener">{{ lead.title }}</a>
+              {% if lead.excerpt %}<br><small class="muted">{{ lead.excerpt[:120] }}</small>{% endif %}
+            </td>
+            <td>
+              {% set intent_band = 'high' if lead.intent_class == 'high_intent' else 'medium' if lead.intent_class == 'emerging' else 'watch' if lead.intent_class == 'potential_company' else 'reject' %}
+              {{ lead.intent_class | status_badge('intent', 'band band-' ~ intent_band) }}
+            </td>
+            <td>{{ '%.0f'|format(lead.relevance_score) }}</td>
+            <td>{{ lead.source_name }}</td>
+            <td class="lead-contact-cell">
+              {% if cinfo and cinfo.count %}
+              <ul class="lead-contact-list">
+                {% for person in cinfo.people %}
+                <li>
+                  <a href="/contacts/{{ person.id }}">{{ person.name }}</a>
+                  {% if person.role %}<small class="muted"> · {{ person.role }}</small>{% endif %}
+                  {% if person.email %}<br><small>{{ person.email }}</small>{% endif %}
+                </li>
+                {% endfor %}
+              </ul>
+              {% if cinfo.count > cinfo.people|length %}
+              <small class="muted">+{{ cinfo.count - cinfo.people|length }} more</small>
+              {% endif %}
+              <div class="lead-contact-actions">
+                <a href="/contacts?company_id={{ lead.company_id }}">All</a>
+                <form method="post" action="/leads/{{ lead.id }}/find-contacts">
+                  <button type="submit" class="outline">Refresh</button>
+                </form>
+              </div>
+              {% else %}
+              <span class="muted"><small>None yet</small></span>
+              {% if lead.status != 'rejected' %}
+              <form method="post" action="/leads/{{ lead.id }}/find-contacts" class="lead-find-form">
+                <button type="submit" class="outline">Find</button>
+              </form>
+              {% endif %}
+              {% endif %}
+            </td>
+            <td class="row-actions">
+              {% if lead.status != 'rejected' %}
+              <form method="post" action="/leads/{{ lead.id }}/qualify">
+                <button type="submit" class="outline">OK</button>
+              </form>
+              <form method="post" action="/leads/{{ lead.id }}/save">
+                <button type="submit" class="outline">Save</button>
+              </form>
+              <form method="post" action="/leads/{{ lead.id }}/reject"
+                    data-confirm="Reject this lead?">
+                <button type="submit" class="outline contrast">Reject</button>
+              </form>
+              {% else %}
+              <span class="muted">rejected</span>
+              {% endif %}
+              {% if lead.company_id %}<a href="/companies/{{ lead.company_id }}">company</a>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted">No leads yet. Save filters, then Run.</p>
+      {% endif %}
+
+      {% if recent %}
+      <details class="more-filters">
+        <summary>Recent companies from feeds</summary>
+        <table>
+          <thead><tr><th>Company</th><th>Feed</th></tr></thead>
+          <tbody>
+            {% for entry, company, feed in recent %}
+            <tr>
+              <td><a href="/companies/{{ company.id }}">{{ company.name }}</a></td>
+              <td>{{ feed.name }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </details>
+      {% endif %}
+    </article>
+  </div>
+</div>
 
 <script id="preset-data" type="application/json">{{ preset_data | tojson }}</script>
 <script id="feed-suggestion-data" type="application/json">{{ feed_suggestion_map | tojson }}</script>
 <script>
-(function () {
-  var panels = document.querySelectorAll(".step-panel");
-  var buttons = document.querySelectorAll("[data-goto]");
-  var stepBtns = document.querySelectorAll(".stepper-btn");
-
-  function goTo(step) {
-    var n = String(step);
-    panels.forEach(function (p) {
-      var on = p.getAttribute("data-step") === n;
-      p.hidden = !on;
-    });
-    stepBtns.forEach(function (b) {
-      var on = b.getAttribute("data-goto") === n;
-      if (on) b.setAttribute("aria-current", "step");
-      else b.removeAttribute("aria-current");
-    });
-    try {
-      history.replaceState(null, "", "#step-" + n);
-    } catch (e) {}
-    var el = document.getElementById("step-" + n);
-    if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
-  }
-
-  buttons.forEach(function (b) {
-    b.addEventListener("click", function () {
-      goTo(b.getAttribute("data-goto"));
-    });
-  });
-
-  var hash = (location.hash || "").replace("#step-", "");
-  var start = "1";
-  if (hash && document.getElementById("step-" + hash)) start = hash;
-  else if ({{ 'true' if recent else 'false' }}) start = "5";
-  else if ({{ 'true' if feeds else 'false' }}) start = "4";
-  goTo(start);
-
-  window.__discoverGoTo = goTo;
-})();
-
 (function () {
   var feedSelect = document.getElementById("feed-suggestion");
   var feedMap = {};
@@ -332,7 +636,7 @@
 })();
 
 (function () {
-  var presetSelect = document.getElementById("focus-preset");
+  var presetRadios = document.querySelectorAll('input[name="focus_preset"]');
   var presetData = {};
   try {
     presetData = JSON.parse(document.getElementById("preset-data").textContent || "{}");
@@ -346,25 +650,204 @@
     });
   }
 
-  if (presetSelect) {
-    presetSelect.addEventListener("change", function () {
-      var key = presetSelect.value;
-      if (key === "custom" || !presetData[key]) return;
-      var spec = presetData[key];
-      setChecked(".kw-choice", spec.keywords || []);
-      setChecked(".ex-choice", spec.exclude_keywords || []);
-      var ind = document.getElementById("use-industries");
-      if (ind && typeof spec.use_profile_industries_as_keywords === "boolean") {
-        ind.checked = spec.use_profile_industries_as_keywords;
-      }
-    });
+  function applyPreset(key) {
+    if (key === "custom" || !presetData[key]) return;
+    var spec = presetData[key];
+    setChecked(".kw-choice", spec.keywords || []);
+    setChecked(".ex-choice", spec.exclude_keywords || []);
+    var ind = document.getElementById("use-industries");
+    if (ind && typeof spec.use_profile_industries_as_keywords === "boolean") {
+      ind.checked = spec.use_profile_industries_as_keywords;
+    }
   }
+
+  presetRadios.forEach(function (radio) {
+    radio.addEventListener("change", function () {
+      if (radio.checked) applyPreset(radio.value);
+    });
+  });
+})();
+
+(function () {
+  var form = document.getElementById("discover-prefs-form");
+  var openBtn = document.getElementById("who-open-btn");
+  var modal = document.getElementById("who-modal");
+  var summary = document.getElementById("who-summary");
+  if (!form || !openBtn || !modal || !summary) return;
+
+  // Mount as a full-page overlay on <body> so it covers nav + Discover.
+  // Keep fields linked to the prefs form via the HTML form="" attribute.
+  modal.querySelectorAll("input, select, textarea").forEach(function (el) {
+    el.setAttribute("form", "discover-prefs-form");
+  });
+  document.body.appendChild(modal);
+
+  function root() {
+    return modal;
+  }
+
+  function checkedLabels(name) {
+    return Array.prototype.slice
+      .call(root().querySelectorAll('input[name="' + name + '"]:checked'))
+      .map(function (el) {
+        var label = el.closest("label");
+        return label ? label.textContent.replace(/\s+/g, " ").trim() : el.value;
+      })
+      .filter(Boolean);
+  }
+
+  function radioLabel(name) {
+    var el = root().querySelector('input[name="' + name + '"]:checked');
+    if (!el) return "";
+    var label = el.closest("label");
+    var text = label ? label.textContent.replace(/\s+/g, " ").trim() : el.value;
+    var cut = text.split(/\s[—–-]\s/)[0];
+    return cut || text;
+  }
+
+  function selectedLocationLabels() {
+    var sel = root().querySelector('select[name="location_choice"]');
+    if (!sel) return [];
+    return Array.prototype.slice
+      .call(sel.selectedOptions)
+      .map(function (opt) { return (opt.textContent || opt.value || "").trim(); })
+      .filter(Boolean);
+  }
+
+  function joinList(items, max) {
+    max = max || 4;
+    if (!items.length) return "—";
+    if (items.length <= max) return items.join(", ");
+    return items.slice(0, max).join(", ") + " +" + (items.length - max);
+  }
+
+  function freshnessLabel() {
+    var sel = root().querySelector('select[name="max_age_days"]');
+    if (!sel || !sel.selectedOptions.length) return "—";
+    return (sel.selectedOptions[0].textContent || "").trim() || "—";
+  }
+
+  function updateSummary() {
+    var bits = [];
+    bits.push("<span class=\"who-bit\"><strong>Preset</strong> " + (radioLabel("focus_preset") || "—") + "</span>");
+    bits.push("<span class=\"who-bit\"><strong>Type</strong> " + joinList(checkedLabels("lead_type")) + "</span>");
+    bits.push("<span class=\"who-bit\"><strong>Services</strong> " + joinList(checkedLabels("service_choice")) + "</span>");
+    var inds = checkedLabels("industry_choice");
+    var mode = radioLabel("industry_mode");
+    bits.push(
+      "<span class=\"who-bit\"><strong>Industries</strong> " +
+        joinList(inds) +
+        (inds.length && mode ? " (" + mode + ")" : "") +
+        "</span>"
+    );
+    var locs = selectedLocationLabels();
+    var remote = root().querySelector('input[name="include_remote"]');
+    var locText = joinList(locs, 3);
+    if (remote && remote.checked) {
+      locText = locText === "—" ? "remote ok" : locText + "; remote ok";
+    }
+    bits.push("<span class=\"who-bit\"><strong>Locations</strong> " + locText + "</span>");
+    var mustEl = root().querySelector('input[name="required_keywords"]');
+    var must = ((mustEl && mustEl.value) || "").trim();
+    bits.push("<span class=\"who-bit\"><strong>Must include</strong> " + (must || "—") + "</span>");
+    var scoreEl = root().querySelector('input[name="min_relevance"]');
+    var score = (scoreEl && scoreEl.value) || "—";
+    bits.push("<span class=\"who-bit\"><strong>Min score</strong> " + score + "</span>");
+    bits.push("<span class=\"who-bit\"><strong>Freshness</strong> " + freshnessLabel() + "</span>");
+    summary.innerHTML = "<strong>Who:</strong> " + bits.join("");
+  }
+
+  function closeModal() {
+    modal.hidden = true;
+    document.body.classList.remove("who-modal-open");
+    updateSummary();
+    openBtn.focus();
+  }
+
+  function openModal() {
+    modal.hidden = false;
+    document.body.classList.add("who-modal-open");
+    var done = modal.querySelector("header [data-who-close]");
+    if (done) done.focus();
+  }
+
+  openBtn.addEventListener("click", openModal);
+  modal.querySelectorAll("[data-who-close]").forEach(function (el) {
+    el.addEventListener("click", closeModal);
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (modal.hidden) return;
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      closeModal();
+    }
+  });
+  modal.addEventListener("change", updateSummary);
+  modal.addEventListener("input", updateSummary);
+  updateSummary();
+})();
+
+(function () {
+  var openBtn = document.getElementById("discovery-history-open");
+  var modal = document.getElementById("discovery-history-modal");
+  if (!openBtn || !modal) return;
+
+  function closeModal() {
+    modal.hidden = true;
+    document.body.classList.remove("discovery-history-open");
+  }
+
+  function openModal() {
+    modal.hidden = false;
+    document.body.classList.add("discovery-history-open");
+    var closeBtn = modal.querySelector("[data-discovery-history-close]");
+    if (closeBtn) closeBtn.focus();
+  }
+
+  openBtn.addEventListener("click", openModal);
+  modal.querySelectorAll("[data-discovery-history-close]").forEach(function (el) {
+    el.addEventListener("click", closeModal);
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (modal.hidden) return;
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      closeModal();
+    }
+  });
+})();
+
+(function () {
+  var selectAll = document.getElementById("leads-select-all");
+  var countEl = document.getElementById("leads-selected-count");
+  var checks = Array.prototype.slice.call(document.querySelectorAll(".lead-check"));
+  var actions = Array.prototype.slice.call(document.querySelectorAll("[data-bulk-action]"));
+  if (!selectAll || !checks.length) return;
+
+  function sync() {
+    var selected = checks.filter(function (el) { return el.checked; }).length;
+    if (countEl) countEl.textContent = selected + " selected";
+    actions.forEach(function (btn) { btn.disabled = selected === 0; });
+    var allOn = selected === checks.length;
+    var noneOn = selected === 0;
+    selectAll.checked = allOn;
+    selectAll.indeterminate = !allOn && !noneOn;
+  }
+
+  selectAll.addEventListener("change", function () {
+    checks.forEach(function (el) { el.checked = selectAll.checked; });
+    sync();
+  });
+  checks.forEach(function (el) {
+    el.addEventListener("change", sync);
+  });
+  sync();
 })();
 
 (function () {
   var btn = document.getElementById("poll-feeds-btn");
   var log = document.getElementById("activity-log");
-  var hint = document.getElementById("activity-hint");
+  var form = document.getElementById("discover-prefs-form");
   if (!btn || !log) return;
 
   var source = null;
@@ -386,15 +869,7 @@
     btn.textContent = "Run discovery";
   }
 
-  btn.addEventListener("click", function () {
-    if (source) return;
-    if (window.__discoverGoTo) window.__discoverGoTo(4);
-    log.textContent = "";
-    if (hint) hint.hidden = true;
-    btn.disabled = true;
-    btn.textContent = "Running…";
-    appendLine("info", "Connecting to discovery stream…");
-
+  function startStream() {
     source = new EventSource("/companies/discover/poll/stream");
     source.onmessage = function (ev) {
       var data;
@@ -407,16 +882,51 @@
       appendLine(data.level || "info", data.message || "");
       if (data.level === "done") {
         stop();
-        setTimeout(function () {
-          location.hash = "#step-5";
-          window.location.reload();
-        }, 900);
+        setTimeout(function () { window.location.reload(); }, 700);
       }
     };
     source.onerror = function () {
-      appendLine("error", "Connection lost. Try again.");
+      appendLine("error", "Connection lost.");
       stop();
     };
+  }
+
+  btn.addEventListener("click", function () {
+    if (source) return;
+    log.textContent = "";
+    btn.disabled = true;
+    btn.textContent = "Saving filters…";
+    appendLine("info", "Saving current filters, then starting discovery…");
+
+    function failSave(msg) {
+      appendLine("error", msg || "Could not save filters.");
+      stop();
+    }
+
+    if (!form) {
+      btn.textContent = "Running…";
+      startStream();
+      return;
+    }
+
+    var body = new FormData(form);
+    fetch("/companies/discover/prefs?ajax=1", {
+      method: "POST",
+      body: body,
+      headers: { "Accept": "application/json" },
+      credentials: "same-origin"
+    }).then(function (res) {
+      if (!res.ok) throw new Error("Save failed (" + res.status + ")");
+      return res.json();
+    }).then(function (data) {
+      if (!data || !data.ok) throw new Error("Save rejected");
+      var sources = (data.enabled_sources || []).join(", ") || "(none)";
+      appendLine("ok", "Filters saved — sources: " + sources);
+      btn.textContent = "Running…";
+      startStream();
+    }).catch(function (err) {
+      failSave(String(err && err.message ? err.message : err));
+    });
   });
 })();
 </script>

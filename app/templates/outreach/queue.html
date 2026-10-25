@@ -3,14 +3,9 @@
 
 {% block content %}
 <header>
-  <h1>Outreach queue</h1>
-  <p>Drafts await your review. Sending stays human — LinkedIn and email are never automated.</p>
+  <h1>Outreach</h1>
+  <p>Review drafts. You send them yourself.</p>
 </header>
-
-<p class="tip">
-  <strong>Tip:</strong> Approve/edit a draft here, then send it yourself (mail or LinkedIn).
-  Come back to log the reply and next action. Prospects arrive from Seed or Discover.
-</p>
 
 {% if flash %}
 <p><mark>{{ flash }}</mark></p>
@@ -34,9 +29,9 @@
       <tr>
         <td>{{ task.opportunity.company.name }}</td>
         <td><a href="/outreach/{{ task.id }}">{{ task.opportunity.title }}</a></td>
-        <td>{{ task.channel }}</td>
-        <td>{{ task.status }}</td>
-        <td>{{ task.due_at or "—" }}</td>
+        <td>{{ task.channel | status_badge('channel') }}</td>
+        <td>{{ task.status | status_badge('outreach') }}</td>
+        <td>{{ task.due_at | when }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -61,7 +56,7 @@
     <tbody>
       {% for item in due_followups %}
       <tr>
-        <td>{{ item.next_action_at }}</td>
+        <td>{{ item.next_action_at | when }}</td>
         <td>{{ item.opportunity.company.name }}</td>
         <td><a href="/opportunities/{{ item.opportunity_id }}">{{ item.opportunity.title }}</a></td>
         <td>{{ item.next_action_note or item.summary }}</td>

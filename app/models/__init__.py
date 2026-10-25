@@ -10,6 +10,13 @@ from app.models.feeds import (
     SourceFeed,
 )
 from app.models.job import Job, JobStatus, JobType
+from app.models.lead import (
+    DiscoveryLead,
+    IntentClass,
+    LeadKind,
+    LeadStatus,
+    SourceCategory,
+)
 from app.models.llm_call import LlmCall
 from app.models.outreach import (
     Interaction,
@@ -20,7 +27,10 @@ from app.models.outreach import (
     OutreachTaskStatus,
 )
 from app.models.person import (
+    CompanyContactChannel,
+    FieldEvidenceStatus,
     Person,
+    PersonDiscoveryStatus,
     PersonSource,
     ResearchTask,
     ResearchTaskStatus,
@@ -39,15 +49,21 @@ __all__ = [
     "AdapterKind",
     "Base",
     "Company",
+    "CompanyContactChannel",
     "CompanyStatus",
+    "DiscoveryLead",
     "DomainFetchPolicy",
     "FeedEntry",
+    "FieldEvidenceStatus",
+    "IntentClass",
     "Interaction",
     "InteractionDirection",
     "InteractionOutcome",
     "Job",
     "JobStatus",
     "JobType",
+    "LeadKind",
+    "LeadStatus",
     "LlmCall",
     "OperatorFeedback",
     "Opportunity",
@@ -57,6 +73,7 @@ __all__ = [
     "OutreachTask",
     "OutreachTaskStatus",
     "Person",
+    "PersonDiscoveryStatus",
     "PersonSource",
     "ResearchTask",
     "ResearchTaskStatus",
@@ -64,6 +81,7 @@ __all__ = [
     "SignalStrength",
     "SignalType",
     "SolutionFamily",
+    "SourceCategory",
     "SourceFeed",
     "SourceSnapshot",
     "SourceType",

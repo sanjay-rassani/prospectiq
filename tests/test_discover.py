@@ -15,14 +15,11 @@ def test_discover_page_ok(client: object) -> None:
     assert b"Discover" in r.content
     assert b"activity-log" in r.content
     assert b"EventSource" in r.content
-    assert b"stepper" in r.content
-    assert b"Live activity" in r.content
-    assert b"Focus preset" in r.content
-    assert b"Include topics" in r.content
-    assert b"Suggested free feed" in r.content
+    assert b"discover-layout" in r.content
+    assert b"Run discovery" in r.content
+    assert b"Results" in r.content
+    assert b"Hacker News" in r.content
     assert b"TechCrunch" in r.content
-    assert b"Free only" in r.content or b"free only" in r.content.lower()
-    assert b"data-goto" in r.content
 
 
 def test_poll_all_feeds_empty(session: Session) -> None:
@@ -77,21 +74,19 @@ def test_poll_all_feeds_with_disabled(session: Session, monkeypatch: object) -> 
 
 def test_discover_poll_stream_sse(client: object, monkeypatch: object) -> None:
     import app.api.companies as companies_api
+    from app.services.leads.engine import DiscoveryStats
 
-    def fake_poll(session: object, **kwargs: object) -> dict[str, int]:
+    def fake_run(session: object, filters: object, **kwargs: object) -> DiscoveryStats:
         on_progress = kwargs.get("on_progress")
         if callable(on_progress):
             on_progress("info", "Fetching demo…")
             on_progress("ok", "Seeded Demo Co (demo.example)")
-        return {
-            "feeds": 1,
-            "new_entries": 1,
-            "seeded": 1,
-            "filtered": 0,
-            "errors": 0,
-        }
+        stats = DiscoveryStats()
+        stats.created = 1
+        stats.seeded = 1
+        return stats
 
-    monkeypatch.setattr(companies_api, "poll_all_feeds", fake_poll)
+    monkeypatch.setattr(companies_api, "run_lead_discovery", fake_run)
     with client.stream("GET", "/companies/discover/poll/stream") as response:  # type: ignore[attr-defined]
         assert response.status_code == 200
         assert "text/event-stream" in response.headers.get("content-type", "")

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% set active = 'contacts' %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ul>
+    <li><a href="/contacts">Contacts</a></li>
+    <li><a href="/companies/{{ person.company_id }}">{{ person.company.name }}</a></li>
+    <li>{{ person.name }}</li>
+  </ul>
+</nav>
+
+<header class="row">
+  <div>
+    <h1>{{ person.name }}</h1>
+    <p>
+      {{ person.role }}
+      {% if person.department %} · {{ person.department }}{% endif %}
+      {% if person.seniority %} · {{ person.seniority }}{% endif %}
+      · {{ person.discovery_status | status_badge('person') }}
+      {% if person.quality_score is not none %} · quality {{ '%.0f'|format(person.quality_score) }}{% endif %}
+    </p>
+  </div>
+  <div class="actions">
+    <form method="post" action="/contacts/{{ person.id }}/enrich">
+      <button type="submit" class="outline">Enrich / re-discover</button>
+    </form>
+    <form method="post" action="/contacts/{{ person.id }}/archive"
+          data-confirm="Archive this contact? It will be hidden from active lists.">
+      <button type="submit" class="outline">Archive</button>
+    </form>
+  </div>
+</header>
+
+{% if flash %}
+<p><mark>{{ flash }}</mark></p>
+{% endif %}
+
+<article>
+  <header><strong>Contact information</strong></header>
+  <dl>
+    <dt>Company</dt>
+    <dd><a href="/companies/{{ person.company_id }}">{{ person.company.name }}</a></dd>
+    <dt>Email</dt>
+    <dd>
+      {{ person.public_email or "—" }}
+      {% if person.public_email %} · <small>{{ person.email_status | status_badge('evidence') }}</small>{% endif %}
+    </dd>
+    <dt>Phone</dt>
+    <dd>{{ person.public_phone or "—" }}</dd>
+    <dt>Professional profile</dt>
+    <dd>
+      {% if person.public_profile_url %}
+      <a href="{{ person.public_profile_url }}" target="_blank" rel="noopener">{{ person.public_profile_url }}</a>
+      · <small>{{ person.profile_status | status_badge('evidence') }}</small>
+      {% else %}
+      —
+      {% endif %}
+    </dd>
+    <dt>Source</dt>
+    <dd>{{ person.source }}</dd>
+    <dt>Last researched</dt>
+    <dd>{{ person.last_researched_at | when }}</dd>
+    <dt>Verified at</dt>
+    <dd>{{ person.verified_at | when }}</dd>
+  </dl>
+  <p class="muted"><small>
+    Email labels are evidence strength, not inbox deliverability. Hover a label for what it means.
+  </small></p>
+</article>
+
+{% if person.fields_json %}
+<article>
+  <header><strong>Field provenance</strong></header>
+  <table>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Value</th>
+        <th>Status</th>
+        <th>Source</th>
+        <th>Excerpt</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for field, rec in person.fields_json.items() %}
+      <tr>
+        <td>{{ field }}</td>
+        <td>{{ rec.value }}</td>
+        <td>{{ rec.status | status_badge('evidence') }}</td>
+        <td>
+          {% if rec.source_url and rec.source_url != 'manual' %}
+          <a href="{{ rec.source_url }}" target="_blank" rel="noopener">source</a>
+          {% else %}
+          {{ rec.source_url or "—" }}
+          {% endif %}
+        </td>
+        <td><small>{{ rec.excerpt or "—" }}</small></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</article>
+{% endif %}
+
+{% if ranked_opportunities %}
+<article>
+  <header><strong>Relevant opportunities</strong></header>
+  <ul>
+    {% for opp, item in ranked_opportunities %}
+    <li>
+      <a href="/opportunities/{{ opp.id }}">{{ opp.title }}</a>
+      · relevance {{ item.relevance_score }}
+      <br><small>{{ item.reason }}</small>
+    </li>
+    {% endfor %}
+  </ul>
+</article>
+{% endif %}
+
+<article>
+  <header><strong>Edit / verify</strong></header>
+  <form method="post" action="/contacts/{{ person.id }}/edit">
+    <label>Name <input type="text" name="name" value="{{ person.name }}" required></label>
+    <label>Role <input type="text" name="role" value="{{ person.role }}" required></label>
+    <label>Department <input type="text" name="department" value="{{ person.department or '' }}"></label>
+    <label>Seniority <input type="text" name="seniority" value="{{ person.seniority or '' }}" placeholder="c-level, head, …"></label>
+    <label>Public email <input type="email" name="public_email" value="{{ person.public_email or '' }}"></label>
+    <label>Public phone <input type="text" name="public_phone" value="{{ person.public_phone or '' }}"></label>
+    <label>Profile URL <input type="url" name="public_profile_url" value="{{ person.public_profile_url or '' }}"></label>
+    <label>Notes <textarea name="notes" rows="3">{{ person.notes or '' }}</textarea></label>
+    <label><input type="checkbox" name="mark_email_verified" value="1"> Mark email manually verified</label>
+    <label><input type="checkbox" name="mark_profile_verified" value="1"> Mark profile manually verified</label>
+    <button type="submit">Save</button>
+  </form>
+</article>
+
+<form method="post" action="/contacts/{{ person.id }}/delete"
+      data-confirm="Permanently delete this contact? This cannot be undone.">
+  <button type="submit" class="outline contrast">Delete permanently</button>
+</form>
+{% endblock %}

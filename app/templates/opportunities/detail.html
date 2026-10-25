@@ -10,281 +10,734 @@
   </ul>
 </nav>
 
-<header>
+<header class="opp-hero">
   <h1>{{ opportunity.title }}</h1>
-  <p>
-    <span class="label label-hypothesis">hypothesis</span>
+  <p class="muted">
+    Deal idea for <a href="/companies/{{ opportunity.company_id }}">{{ opportunity.company.name }}</a>
     · {{ opportunity.solution_family }}
-    · confidence {{ opportunity.confidence }}
-    · {{ opportunity.status }}
+    · {{ opportunity.status | status_badge('opportunity') }}
+  </p>
+  <p class="tip">
+    <strong>What this page is:</strong>
+    A step-by-step workspace for one deal idea — understand the opportunity, find the right person,
+    prepare a message (you send it yourself), then track replies. Nothing is emailed or messaged automatically.
   </p>
 </header>
 
-{# ICP Fit and Opportunity Score are shown separately and never blended (AC-6). #}
-<article>
-  <header><strong>Company ICP Fit</strong> <small>(who they are — timing-blind)</small></header>
-  <p>
-    {% if opportunity.company.icp_score is not none %}
-    <strong>{{ '%.1f'|format(opportunity.company.icp_score) }}</strong>
-    {% if opportunity.company.priority %}
-    · band <span class="band band-{{ opportunity.company.priority }}">{{ opportunity.company.priority }}</span>
-    {% endif %}
-    {% else %}
-    Not scored
-    {% endif %}
-  </p>
-</article>
-
-<article>
-  <header><strong>Opportunity Score</strong> <small>(is this worth approaching now)</small></header>
-  {% if opportunity.opportunity_score is not none %}
-  <p>
-    Score <strong>{{ '%.1f'|format(opportunity.opportunity_score) }}</strong>
-    {% if opportunity.priority %}
-    · band <span class="band band-{{ opportunity.priority }}">{{ opportunity.priority }}</span>
-    {% endif %}
-  </p>
-  {% if opportunity.score_reasons_json and opportunity.score_reasons_json.dimensions %}
-  <table>
-    <thead><tr><th>Dimension</th><th>Weight</th><th>Score</th><th>Reason</th></tr></thead>
-    <tbody>
-      {% for dim in opportunity.score_reasons_json.dimensions %}
-      <tr>
-        <td>{{ dim.key }}</td>
-        <td>{{ '%.0f'|format(dim.weight * 100) }}%</td>
-        <td>{{ '%.0f'|format(dim.score) }}</td>
-        <td>{{ dim.reason }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-  {% else %}
-  <p>Not scored yet.</p>
-  {% endif %}
-
-  {% if opportunity.promotion_blockers %}
-  <p><strong>Not outreach-ready:</strong></p>
-  <ul>
-    {% for blocker in opportunity.promotion_blockers %}
-    <li>{{ blocker }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-
-  {% if opportunity.outreach_ready_override %}
-  <p><mark>Operator override: {{ opportunity.outreach_ready_override_reason }}</mark></p>
-  {% elif opportunity.status != 'outreach_ready' %}
-  <form method="post" action="/opportunities/{{ opportunity.id }}/override-outreach-ready">
-    <label>
-      Override to outreach-ready (reason required)
-      <input type="text" name="reason" required placeholder="Why promote despite blockers?">
-    </label>
-    <button type="submit">Override</button>
-  </form>
-  {% endif %}
-</article>
-
-<article>
-  <header><strong>Problem or change</strong> <span class="label label-inference">inference</span></header>
-  <p>{{ opportunity.problem_or_change }}</p>
-</article>
-
-<article>
-  <header><strong>Project hypothesis</strong> <span class="label label-hypothesis">hypothesis</span></header>
-  <p>{{ opportunity.hypothesis }}</p>
-</article>
-
-<article>
-  <header><strong>Why now</strong></header>
-  <p>{{ opportunity.why_now }}</p>
-</article>
-
-<article>
-  <header><strong>Business outcome</strong></header>
-  <p>{{ opportunity.business_outcome }}</p>
-</article>
-
-<article>
-  <header><strong>Buyer role</strong></header>
-  <p>{{ opportunity.buyer_role }}</p>
-  {% if opportunity.buyer_role_rationale %}
-  <p><small>{{ opportunity.buyer_role_rationale }}</small></p>
-  {% endif %}
-  {% if matching_people %}
-  <p><strong>Matching people</strong></p>
-  <ul>
-    {% for person in matching_people %}
+<nav class="stepper" aria-label="Opportunity steps" data-opp-stepper>
+  <ol class="stepper-list">
     <li>
-      {{ person.name }} — {{ person.role }}
-      {% if person.public_email %} · {{ person.public_email }}{% endif %}
-      {% if person.public_profile_url %}
-      · <a href="{{ person.public_profile_url }}" target="_blank" rel="noopener">profile</a>
-      {% endif %}
+      <button type="button" class="stepper-btn" data-step="1" {% if step == 1 %}aria-current="step"{% endif %}>
+        <span class="step-num">1</span> Understand
+      </button>
     </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% if open_research_tasks %}
-  <p><strong>Manual research</strong></p>
-  <ul>
-    {% for task in open_research_tasks %}
     <li>
-      {{ task.title }}
-      <form method="post" action="/research-tasks/{{ task.id }}/done" style="display:inline">
-        <button type="submit" class="outline">Mark done</button>
+      <button type="button" class="stepper-btn" data-step="2" {% if step == 2 %}aria-current="step"{% endif %}>
+        <span class="step-num">2</span> Find contact
+        {% if not has_contacts %}<span class="step-need">needed</span>{% endif %}
+      </button>
+    </li>
+    <li>
+      <button type="button" class="stepper-btn" data-step="3" {% if step == 3 %}aria-current="step"{% endif %}>
+        <span class="step-num">3</span> Outreach
+      </button>
+    </li>
+    <li>
+      <button type="button" class="stepper-btn" data-step="4" {% if step == 4 %}aria-current="step"{% endif %}>
+        <span class="step-num">4</span> Follow up
+      </button>
+    </li>
+    <li>
+      <button type="button" class="stepper-btn" data-step="5" {% if step == 5 %}aria-current="step"{% endif %}>
+        <span class="step-num">5</span> Manage
+      </button>
+    </li>
+  </ol>
+</nav>
+
+{# ——— Step 1: Understand ——— #}
+<section class="step-panel" data-panel="1" {% if step != 1 %}hidden{% endif %}>
+  <article>
+    <header>
+      <strong>Step 1 — Understand the opportunity</strong>
+    </header>
+    <p class="section-help">
+      Read why this company might need help, what we think we could build, and whether it is worth approaching now.
+      Scores are prioritisation aids — not a guarantee they will buy.
+    </p>
+
+    <div class="score-pair">
+      <div>
+        <h3>Company fit <small class="muted">(who they are)</small></h3>
+        <p class="section-help">Does this company look like your kind of customer? Ignores timing.</p>
+        {% if opportunity.company.icp_score is not none %}
+        <p>
+          <strong>{{ '%.1f'|format(opportunity.company.icp_score) }}</strong>
+          {% if opportunity.company.priority %}
+          · band {{ opportunity.company.priority | priority_badge }}
+          {% endif %}
+        </p>
+        {% else %}
+        <p class="muted">Not scored yet.</p>
+        {% endif %}
+      </div>
+      <div>
+        <h3>Deal timing <small class="muted">(approach now?)</small></h3>
+        <p class="section-help">Is there evidence they need this <em>now</em>?</p>
+        {% if opportunity.opportunity_score is not none %}
+        <p>
+          Score <strong>{{ '%.1f'|format(opportunity.opportunity_score) }}</strong>
+          {% if opportunity.priority %}
+          · band {{ opportunity.priority | priority_badge }}
+          {% endif %}
+        </p>
+        {% else %}
+        <p class="muted">Not scored yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if opportunity.score_reasons_json and opportunity.score_reasons_json.dimensions %}
+    <details class="more-filters">
+      <summary>Why this deal score?</summary>
+      <table>
+        <thead><tr><th>Factor</th><th>Weight</th><th>Score</th><th>Plain-language reason</th></tr></thead>
+        <tbody>
+          {% for dim in opportunity.score_reasons_json.dimensions %}
+          <tr>
+            <td>{{ dim.key }}</td>
+            <td>{{ '%.0f'|format(dim.weight * 100) }}%</td>
+            <td>{{ '%.0f'|format(dim.score) }}</td>
+            <td>{{ dim.reason }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% endif %}
+
+    {% if opportunity.promotion_blockers %}
+    <p><strong>Not ready for outreach yet:</strong></p>
+    <ul>
+      {% for blocker in opportunity.promotion_blockers %}
+      <li>{{ blocker }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if opportunity.outreach_ready_override %}
+    <p><mark>You overrode blockers: {{ opportunity.outreach_ready_override_reason }}</mark></p>
+    {% elif opportunity.status != 'outreach_ready' %}
+    <details class="more-filters">
+      <summary>Advanced: force outreach-ready</summary>
+      <form method="post" action="/opportunities/{{ opportunity.id }}/override-outreach-ready"
+            data-confirm="Force this opportunity to Ready to approach despite blockers?">
+        <label>
+          Reason (required)
+          <input type="text" name="reason" required placeholder="Why promote despite blockers?">
+        </label>
+        <button type="submit">Override</button>
       </form>
-    </li>
-    {% endfor %}
-  </ul>
-  <p><small>LinkedIn research is human-operated. The system never scrapes LinkedIn or guesses emails.</small></p>
-  {% endif %}
-</article>
+    </details>
+    {% endif %}
 
-<article>
-  <header><strong>Outreach</strong></header>
-  {% if opportunity.status in ['outreach_ready', 'active'] %}
-  <form method="post" action="/opportunities/{{ opportunity.id }}/outreach">
-    <label>
-      Channel
-      <select name="channel">
-        <option value="linkedin">LinkedIn</option>
-        <option value="email">Email</option>
-      </select>
-    </label>
-    <button type="submit">Prepare outreach brief</button>
-  </form>
-  {% endif %}
-  {% if outreach_tasks %}
-  <ul>
-    {% for task in outreach_tasks %}
-    <li>
-      <a href="/outreach/{{ task.id }}">{{ task.channel }} · {{ task.status }}</a>
-      {% if task.due_at %} · due {{ task.due_at }}{% endif %}
-    </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-</article>
+    <dl class="opp-story">
+      <dt>What changed <span class="label label-inference">guess from evidence</span></dt>
+      <dd>{{ opportunity.problem_or_change }}</dd>
+      <dt>What we could offer <span class="label label-hypothesis">idea</span></dt>
+      <dd>{{ opportunity.hypothesis }}</dd>
+      <dt>Why contact them now</dt>
+      <dd>{{ opportunity.why_now }}</dd>
+      <dt>Business outcome (if it works)</dt>
+      <dd>{{ opportunity.business_outcome }}</dd>
+    </dl>
 
-<article>
-  <header><strong>Interactions</strong></header>
-  {% if opportunity.interactions %}
-  <table>
-    <thead>
-      <tr>
-        <th>When</th>
-        <th>Dir</th>
-        <th>Channel</th>
-        <th>Outcome</th>
-        <th>Summary</th>
-        <th>Next</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in opportunity.interactions %}
-      <tr>
-        <td>{{ item.occurred_at }}</td>
-        <td>{{ item.direction }}</td>
-        <td>{{ item.channel }}</td>
-        <td>{{ item.outcome }}</td>
-        <td>{{ item.summary }}</td>
-        <td>
-          {% if item.next_action_at %}
-          <strong>{{ item.next_action_at }}</strong>
-          {% if item.next_action_note %} — {{ item.next_action_note }}{% endif %}
-          {% else %}—{% endif %}
-        </td>
-      </tr>
+    <details class="more-filters">
+      <summary>Unknowns / risks</summary>
+      {% if opportunity.unknowns %}
+      <ul>
+        {% for item in opportunity.unknowns %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">None stated.</p>
+      {% endif %}
+    </details>
+
+    <details class="more-filters">
+      <summary>Evidence (quotes from their site / sources)</summary>
+      {% if opportunity.evidence_links %}
+      {% for link in opportunity.evidence_links %}
+      {% if link.signal %}
+      <section>
+        <p>
+          <strong>{{ link.signal.type }}</strong>
+          · {{ link.signal.strength }}
+          <span class="label label-fact">observed</span>
+        </p>
+        <p>{{ link.signal.summary }}</p>
+        <blockquote class="evidence">{{ link.signal.evidence_excerpt | sanitize }}</blockquote>
+        {% if link.signal.source_snapshot_id %}
+        <p><small>From <a href="/companies/{{ opportunity.company_id }}#snap-{{ link.signal.source_snapshot_id }}">source snapshot</a></small></p>
+        {% endif %}
+      </section>
+      {% endif %}
       {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p>No interactions yet.</p>
-  {% endif %}
+      {% else %}
+      <p class="muted">No evidence linked.</p>
+      {% endif %}
+    </details>
+  </article>
+  <div class="stepper-nav">
+    <span></span>
+    <button type="button" class="step-next" data-goto="2">Next: Find contact →</button>
+  </div>
+</section>
 
-  <form method="post" action="/opportunities/{{ opportunity.id }}/interactions">
-    <fieldset>
-      <legend>Record interaction</legend>
-      <label>Channel
+{# ——— Step 2: Find contact ——— #}
+<section class="step-panel" data-panel="2" {% if step != 2 %}hidden{% endif %}>
+  <article>
+    <header>
+      <strong>Step 2 — Find the right person</strong>
+    </header>
+    <p class="section-help">
+      You need a real person to talk to (usually {{ opportunity.buyer_role or "a decision-maker" }}).
+      The app can scan the company website. LinkedIn and Google searches open in <em>your</em> browser —
+      you stay logged into your accounts; the app never logs in or scrapes those sites.
+    </p>
+
+    <div class="buyer-role-card">
+      <h3>Who to look for</h3>
+      <p><strong>{{ opportunity.buyer_role or "Decision maker" }}</strong></p>
+      {% if opportunity.buyer_role_rationale %}
+      <p class="muted">{{ opportunity.buyer_role_rationale }}</p>
+      {% endif %}
+    </div>
+
+    {% if finding %}
+    <div class="find-loading" id="find-loading" aria-live="polite"
+         data-stream-url="/opportunities/{{ opportunity.id }}/discover-contacts/stream{% if refresh_scan %}?refresh=1{% endif %}">
+      <div class="find-spinner" aria-hidden="true"></div>
+      <div class="find-loading-body">
+        <strong>Scanning company website…</strong>
+        <p class="find-log" id="find-loading-status" title="Live progress">Starting…</p>
+        <ul class="find-findings" id="find-findings" hidden></ul>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="find-layers">
+      <h3>Find contact — choose a layer</h3>
+      <p class="section-help">Start with Layer A (automatic). If that finds no one, use B–D manually, then paste what you found.</p>
+
+      <div class="find-layer">
+        <div class="find-layer-head">
+          <span class="find-layer-num">A</span>
+          <div>
+            <strong>Scan company website</strong>
+            <p class="muted">Fetches public about/team/contact pages and extracts names already published there.</p>
+          </div>
+        </div>
+        <div class="find-layer-actions">
+          <form method="post" action="/opportunities/{{ opportunity.id }}/discover-contacts" id="find-scan-form">
+            <button type="submit" {% if finding %}disabled aria-busy="true"{% endif %}>
+              {% if finding %}Scanning…{% else %}Find contacts on website{% endif %}
+            </button>
+          </form>
+          <form method="post" action="/opportunities/{{ opportunity.id }}/discover-contacts">
+            <input type="hidden" name="refresh" value="1">
+            <button type="submit" class="outline" {% if finding %}disabled{% endif %}>Refresh scan</button>
+          </form>
+        </div>
+        {% if previous_scans %}
+        <details class="previous-scans">
+          <summary>Previous scans ({{ previous_scans|length }})</summary>
+          <ul>
+            {% for scan in previous_scans %}
+            <li>
+              {{ scan.at | when }}
+              <span class="{% if scan.ok %}scan-ok{% else %}scan-fail{% endif %}">{{ scan.outcome }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </details>
+        {% else %}
+        <p class="muted previous-scans-empty"><small>No previous website scans yet.</small></p>
+        {% endif %}
+      </div>
+
+      <div class="find-layer">
+        <div class="find-layer-head">
+          <span class="find-layer-num">B</span>
+          <div>
+            <strong>Search Google</strong>
+            <p class="muted">Opens a search for {{ opportunity.buyer_role or "the role" }} at this company. You copy anything useful back here.</p>
+          </div>
+        </div>
+        <div class="find-layer-actions">
+          <a href="{{ research_links.google_search }}" target="_blank" rel="noopener" role="button" class="outline">
+            Open Google search
+          </a>
+          <a href="{{ research_links.google_linkedin }}" target="_blank" rel="noopener" role="button" class="outline">
+            Google → LinkedIn profiles
+          </a>
+        </div>
+        <p class="muted"><small>Query: {{ research_links.google_query_label }}</small></p>
+      </div>
+
+      <div class="find-layer">
+        <div class="find-layer-head">
+          <span class="find-layer-num">C</span>
+          <div>
+            <strong>Search LinkedIn (your account)</strong>
+            <p class="muted">Opens LinkedIn people search in a new tab. Log in yourself if needed — we never use your password or scrape LinkedIn.</p>
+          </div>
+        </div>
+        <div class="find-layer-actions">
+          <a href="{{ research_links.linkedin_search }}" target="_blank" rel="noopener" role="button">
+            Open LinkedIn search
+          </a>
+          <a href="{{ research_links.company_site }}" target="_blank" rel="noopener" role="button" class="outline">
+            Open company site
+          </a>
+        </div>
+        {% if research_links.site_people_pages %}
+        <p class="muted"><small>Likely people pages:</small></p>
+        <ul class="find-page-list">
+          {% for url in research_links.site_people_pages[:4] %}
+          <li><a href="{{ url }}" target="_blank" rel="noopener">{{ url }}</a></li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+
+      <div class="find-layer">
+        <div class="find-layer-head">
+          <span class="find-layer-num">D</span>
+          <div>
+            <strong>Paste what you found</strong>
+            <p class="muted">Only public info you found yourself. Never invent an email.</p>
+          </div>
+        </div>
+        <form method="post" action="/companies/{{ opportunity.company_id }}/people" class="find-paste-form">
+          <input type="hidden" name="return_to" value="/opportunities/{{ opportunity.id }}?step=2">
+          <div class="grid">
+            <label>Name <input type="text" name="name" required placeholder="Jane Smith"></label>
+            <label>Role <input type="text" name="role" required value="{{ opportunity.buyer_role or '' }}" placeholder="CTO"></label>
+          </div>
+          <div class="grid">
+            <label>Public email <input type="email" name="public_email" placeholder="optional — never guessed"></label>
+            <label>Profile URL <input type="url" name="public_profile_url" placeholder="https://linkedin.com/in/…"></label>
+          </div>
+          <button type="submit">Save contact</button>
+        </form>
+      </div>
+    </div>
+
+    {% if ranked_contacts %}
+    <h3>Contacts for this company</h3>
+    <p class="section-help">Relevance is title match to the buyer role — not proof they are the decision-maker.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Contact</th>
+          <th>Title</th>
+          <th>Relevance</th>
+          <th>How to reach</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in ranked_contacts %}
+        <tr>
+          <td><a href="/contacts/{{ item.person.id }}">{{ item.person.name }}</a></td>
+          <td>{{ item.person.role }}</td>
+          <td>{{ item.relevance_score }}{% if item.matched_roles %}<br><small>{{ item.matched_roles | join(', ') }}</small>{% endif %}</td>
+          <td>
+            {% if item.person.public_email %}{{ item.person.public_email }}{% else %}<span class="muted">no email</span>{% endif %}
+            {% if item.person.public_profile_url %}
+            · <a href="{{ item.person.public_profile_url }}" target="_blank" rel="noopener">profile</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% elif matching_people %}
+    <h3>Matching people</h3>
+    <ul>
+      {% for person in matching_people %}
+      <li>
+        <a href="/contacts/{{ person.id }}">{{ person.name }}</a> — {{ person.role }}
+        {% if person.public_email %} · {{ person.public_email }}{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% elif company_people %}
+    <h3>People on file</h3>
+    <p class="muted">None closely match {{ opportunity.buyer_role }} yet — check titles or keep researching.</p>
+    <ul>
+      {% for person in company_people[:10] %}
+      <li><a href="/contacts/{{ person.id }}">{{ person.name }}</a> — {{ person.role }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">No contacts yet — run Layer A or paste from B–C.</p>
+    {% endif %}
+
+    {% if open_research_tasks %}
+    <h3>Research checklist</h3>
+    <ul>
+      {% for task in open_research_tasks %}
+      <li>
+        {{ task.title }}
+        <form method="post" action="/research-tasks/{{ task.id }}/done" style="display:inline">
+          <button type="submit" class="outline">Mark done</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </article>
+  <div class="stepper-nav">
+    <button type="button" class="outline step-prev" data-goto="1">← Back</button>
+    <button type="button" class="step-next" data-goto="3" {% if not has_contacts %}title="Add a contact first if you can"{% endif %}>
+      Next: Outreach →
+    </button>
+  </div>
+</section>
+
+{# ——— Step 3: Outreach ——— #}
+<section class="step-panel" data-panel="3" {% if step != 3 %}hidden{% endif %}>
+  <article>
+    <header>
+      <strong>Step 3 — Prepare outreach</strong>
+    </header>
+    <p class="section-help">
+      Build a brief and draft. You approve it, then <strong>you</strong> send it on LinkedIn or email.
+      The app never sends messages.
+    </p>
+
+    {% if not has_contacts %}
+    <p class="tip"><strong>Tip:</strong> Go back to <button type="button" class="linkish step-next" data-goto="2">Find contact</button> first — outreach works best with a named person.</p>
+    {% endif %}
+
+    {% if opportunity.status in ['outreach_ready', 'active'] %}
+    <form method="post" action="/opportunities/{{ opportunity.id }}/outreach">
+      <label>
+        Contact
+        <select name="person_id">
+          <option value="">Auto-match buyer role (if possible)</option>
+          {% for item in ranked_contacts %}
+          <option value="{{ item.person.id }}">
+            {{ item.person.name }} — {{ item.person.role }}
+            {% if item.person.public_email %} · email{% endif %}
+            {% if item.person.public_profile_url %} · profile{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Channel
         <select name="channel">
           <option value="linkedin">LinkedIn</option>
           <option value="email">Email</option>
         </select>
       </label>
-      <label>Direction
-        <select name="direction">
-          <option value="inbound">Inbound (reply)</option>
-          <option value="outbound">Outbound</option>
-        </select>
-      </label>
-      <label>Outcome
-        <select name="outcome">
-          {% for o in interaction_outcomes %}
-          <option value="{{ o }}">{{ o }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Summary <input type="text" name="summary" placeholder="Short note"></label>
-      <label>Raw text <textarea name="raw_text" rows="3" placeholder="Paste reply text (optional)"></textarea></label>
-      <label>Next action note <input type="text" name="next_action_note" placeholder="e.g. Follow up Tuesday"></label>
-      <label>Next action at <input type="datetime-local" name="next_action_at"></label>
-      <button type="submit">Save interaction</button>
-    </fieldset>
-  </form>
-</article>
-
-<article>
-  <header><strong>Lifecycle</strong></header>
-  <form method="post" action="/opportunities/{{ opportunity.id }}/lifecycle" style="display:inline">
-    <select name="status">
-      <option value="watch">watch</option>
-      <option value="nurture">nurture</option>
-      <option value="rejected">rejected</option>
-      <option value="closed">closed</option>
-      <option value="conversation">conversation</option>
-      <option value="project_lead">project_lead</option>
-    </select>
-    <button type="submit" class="secondary">Move status</button>
-  </form>
-  <form method="post" action="/opportunities/{{ opportunity.id }}/check-stale" style="display:inline">
-    <button type="submit" class="outline">Check stale evidence</button>
-  </form>
-</article>
-
-<article>
-  <header><strong>Unknowns / risks</strong></header>
-  {% if opportunity.unknowns %}
-  <ul>
-    {% for item in opportunity.unknowns %}
-    <li>{{ item }}</li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p>None stated.</p>
-  {% endif %}
-</article>
-
-<article>
-  <header><strong>Evidence</strong> <span class="label label-fact">observed</span></header>
-  {% if opportunity.evidence_links %}
-  {% for link in opportunity.evidence_links %}
-  {% if link.signal %}
-  <section>
-    <p>
-      <strong>{{ link.signal.type }}</strong>
-      · {{ link.signal.strength }}
-    </p>
-    <p>{{ link.signal.summary }}</p>
-    <blockquote class="evidence">{{ link.signal.evidence_excerpt | sanitize }}</blockquote>
-    {% if link.signal.source_snapshot_id %}
-    <p><small>From <a href="/companies/{{ opportunity.company_id }}#snap-{{ link.signal.source_snapshot_id }}">source snapshot</a></small></p>
+      <button type="submit">Prepare outreach brief</button>
+    </form>
+    <p class="muted">Email channel needs a public email on the contact.</p>
+    {% else %}
+    <p class="muted">Status is {{ opportunity.status | status_badge('opportunity') }} — prepare a brief when it says Ready to approach (or override in Step 1).</p>
     {% endif %}
-  </section>
-  {% endif %}
-  {% endfor %}
-  {% else %}
-  <p>No evidence linked.</p>
-  {% endif %}
-</article>
+
+    {% if outreach_tasks %}
+    <h3>Your drafts</h3>
+    <ul>
+      {% for task in outreach_tasks %}
+      <li>
+        <a href="/outreach/{{ task.id }}">{{ task.channel | status_label('channel') }} · {{ task.status | status_badge('outreach') }}</a>
+        {% if task.due_at %} · due {{ task.due_at | when }}{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </article>
+  <div class="stepper-nav">
+    <button type="button" class="outline step-prev" data-goto="2">← Back</button>
+    <button type="button" class="step-next" data-goto="4">Next: Follow up →</button>
+  </div>
+</section>
+
+{# ——— Step 4: Follow up ——— #}
+<section class="step-panel" data-panel="4" {% if step != 4 %}hidden{% endif %}>
+  <article>
+    <header>
+      <strong>Step 4 — Record what happened</strong>
+    </header>
+    <p class="section-help">
+      After you send a message or get a reply, log it here so Today can remind you of follow-ups.
+    </p>
+
+    {% if opportunity.interactions %}
+    <table>
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Dir</th>
+          <th>Channel</th>
+          <th>Outcome</th>
+          <th>Summary</th>
+          <th>Next</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in opportunity.interactions %}
+        <tr>
+          <td>{{ item.occurred_at | when }}</td>
+          <td>{{ item.direction }}</td>
+          <td>{{ item.channel }}</td>
+          <td>{{ item.outcome }}</td>
+          <td>{{ item.summary }}</td>
+          <td>
+            {% if item.next_action_at %}
+            <strong>{{ item.next_action_at | when }}</strong>
+            {% if item.next_action_note %} — {{ item.next_action_note }}{% endif %}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No interactions yet.</p>
+    {% endif %}
+
+    <form method="post" action="/opportunities/{{ opportunity.id }}/interactions">
+      <fieldset>
+        <legend>Record interaction</legend>
+        <label>Channel
+          <select name="channel">
+            <option value="linkedin">LinkedIn</option>
+            <option value="email">Email</option>
+          </select>
+        </label>
+        <label>Direction
+          <select name="direction">
+            <option value="outbound">Outbound (you sent)</option>
+            <option value="inbound">Inbound (reply)</option>
+          </select>
+        </label>
+        <label>Outcome
+          <select name="outcome">
+            {% for o in interaction_outcomes %}
+            <option value="{{ o }}">{{ o }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Summary <input type="text" name="summary" placeholder="Short note"></label>
+        <label>Raw text <textarea name="raw_text" rows="3" placeholder="Paste reply text (optional)"></textarea></label>
+        <label>Next action note <input type="text" name="next_action_note" placeholder="e.g. Follow up Tuesday"></label>
+        <label>Next action at <input type="datetime-local" name="next_action_at"></label>
+        <button type="submit">Save interaction</button>
+      </fieldset>
+    </form>
+  </article>
+  <div class="stepper-nav">
+    <button type="button" class="outline step-prev" data-goto="3">← Back</button>
+    <button type="button" class="step-next" data-goto="5">Next: Manage →</button>
+  </div>
+</section>
+
+{# ——— Step 5: Manage ——— #}
+<section class="step-panel" data-panel="5" {% if step != 5 %}hidden{% endif %}>
+  <article>
+    <header>
+      <strong>Step 5 — Manage this opportunity</strong>
+    </header>
+    <p class="section-help">
+      Change pipeline status or re-check whether the evidence is too old to act on.
+    </p>
+
+    <form method="post" action="/opportunities/{{ opportunity.id }}/lifecycle" style="display:inline"
+          data-confirm="Change this opportunity's lifecycle status?">
+      <label>
+        Lifecycle status
+        <select name="status">
+          <option value="watch" {% if opportunity.status == 'watch' %}selected{% endif %}>Watch — keep an eye on</option>
+          <option value="nurture" {% if opportunity.status == 'nurture' %}selected{% endif %}>Nurture — soft stay-in-touch</option>
+          <option value="conversation" {% if opportunity.status == 'conversation' %}selected{% endif %}>In conversation — talking</option>
+          <option value="project_lead" {% if opportunity.status == 'project_lead' %}selected{% endif %}>Project lead — real lead</option>
+          <option value="rejected" {% if opportunity.status == 'rejected' %}selected{% endif %}>Rejected — not a fit</option>
+          <option value="closed" {% if opportunity.status == 'closed' %}selected{% endif %}>Closed — done</option>
+        </select>
+      </label>
+      <button type="submit" class="secondary">Move status</button>
+    </form>
+    <form method="post" action="/opportunities/{{ opportunity.id }}/check-stale" style="display:inline"
+          data-confirm="Check for stale evidence? This may stop outreach if signals are too old.">
+      <button type="submit" class="outline">Check stale evidence</button>
+    </form>
+  </article>
+  <div class="stepper-nav">
+    <button type="button" class="outline step-prev" data-goto="4">← Back</button>
+    <a href="/companies/{{ opportunity.company_id }}" role="button" class="outline">Back to company</a>
+  </div>
+</section>
+
+<script>
+(function () {
+  var root = document.querySelector("[data-opp-stepper]");
+  if (!root) return;
+  var buttons = root.querySelectorAll(".stepper-btn");
+  var panels = document.querySelectorAll(".step-panel");
+  var navBtns = document.querySelectorAll(".step-next, .step-prev");
+
+  function showStep(n) {
+    n = String(n);
+    buttons.forEach(function (btn) {
+      if (btn.getAttribute("data-step") === n) btn.setAttribute("aria-current", "step");
+      else btn.removeAttribute("aria-current");
+    });
+    panels.forEach(function (panel) {
+      panel.hidden = panel.getAttribute("data-panel") !== n;
+    });
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.set("step", n);
+      url.searchParams.delete("finding");
+      window.history.replaceState({}, "", url);
+    } catch (e) {}
+  }
+
+  buttons.forEach(function (btn) {
+    btn.addEventListener("click", function () { showStep(btn.getAttribute("data-step")); });
+  });
+  navBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () { showStep(btn.getAttribute("data-goto")); });
+  });
+})();
+
+(function () {
+  var box = document.getElementById("find-loading");
+  if (!box) return;
+  var statusEl = document.getElementById("find-loading-status");
+  var findingsEl = document.getElementById("find-findings");
+  var url = box.getAttribute("data-stream-url");
+  if (!url || typeof EventSource === "undefined") return;
+
+  var startedCount = null;
+  var source = new EventSource(url);
+  var finished = false;
+  var logLines = [];
+
+  function showFindings(list) {
+    if (!findingsEl) return;
+    findingsEl.innerHTML = "";
+    if (!list || !list.length) {
+      findingsEl.hidden = true;
+      return;
+    }
+    findingsEl.hidden = false;
+    var title = document.createElement("li");
+    title.className = "find-findings-title";
+    title.textContent = "Findings (" + list.length + ")";
+    findingsEl.appendChild(title);
+    list.slice(0, 20).forEach(function (item) {
+      var li = document.createElement("li");
+      var label = (item.name || "?") + (item.role ? " — " + item.role : "");
+      if (item.email) label += " · " + item.email;
+      if (item.action) label += " (" + item.action + ")";
+      li.textContent = label;
+      findingsEl.appendChild(li);
+    });
+    if (list.length > 20) {
+      var more = document.createElement("li");
+      more.textContent = "…and " + (list.length - 20) + " more";
+      findingsEl.appendChild(more);
+    }
+  }
+
+  function finish(data) {
+    if (finished) return;
+    finished = true;
+    try { source.close(); } catch (e) {}
+    if (data.findings) showFindings(data.findings);
+    if (statusEl) {
+      statusEl.textContent = data.message || "Scan finished.";
+      statusEl.setAttribute("data-level", data.status === "failed" ? "error" : "ok");
+    }
+    var dest = new URL(window.location.href);
+    dest.searchParams.set("step", "2");
+    dest.searchParams.delete("finding");
+    dest.searchParams.delete("refresh");
+    var grew = typeof data.people_count === "number"
+      && startedCount !== null
+      && data.people_count > startedCount;
+    var created = data.created || 0;
+    var nFindings = (data.findings && data.findings.length) || 0;
+    if (data.status === "failed" || data.level === "error") {
+      dest.searchParams.set("flash", data.message || "Contact scan failed — try again or use Google / LinkedIn layers.");
+    } else if (grew || created > 0 || nFindings > 0 || (data.people_count || 0) > 0) {
+      var flash = data.message || "Contact scan finished.";
+      if (nFindings > 0) {
+        flash += " · " + nFindings + " listed above.";
+      }
+      dest.searchParams.set("flash", flash);
+    } else {
+      dest.searchParams.set("flash", "Scan finished — no public contacts found. Try Google or LinkedIn layers.");
+    }
+    // Pause so the findings list is readable before reload.
+    setTimeout(function () { window.location.href = dest.toString(); }, nFindings ? 2800 : 900);
+  }
+
+  source.onmessage = function (ev) {
+    var data;
+    try { data = JSON.parse(ev.data); } catch (e) { return; }
+    if (typeof data.started_count === "number" && startedCount === null) {
+      startedCount = data.started_count;
+    }
+    if (statusEl && data.message) {
+      statusEl.textContent = data.message;
+      statusEl.setAttribute("title", data.message);
+      statusEl.setAttribute("data-level", data.level || "info");
+      if (data.message.indexOf("Findings:") === 0 || data.message.indexOf("· ") === 0) {
+        logLines.push(data.message);
+        if (findingsEl && data.message.indexOf("· ") === 0) {
+          findingsEl.hidden = false;
+          if (!findingsEl.querySelector(".find-findings-title")) {
+            var t = document.createElement("li");
+            t.className = "find-findings-title";
+            t.textContent = "Findings";
+            findingsEl.appendChild(t);
+          }
+          var li = document.createElement("li");
+          li.textContent = data.message.replace(/^·\s*/, "");
+          findingsEl.appendChild(li);
+        } else if (findingsEl && data.message.indexOf("Findings:") === 0) {
+          findingsEl.hidden = false;
+          findingsEl.innerHTML = "";
+          var title = document.createElement("li");
+          title.className = "find-findings-title";
+          title.textContent = data.message;
+          findingsEl.appendChild(title);
+        }
+      }
+    }
+    if (data.done || data.level === "done" || data.status === "failed" || data.status === "missing") {
+      finish(data);
+    }
+  };
+
+  source.onerror = function () {
+    if (finished) return;
+    // Avoid EventSource auto-reconnect starting a second scan.
+    try { source.close(); } catch (e) {}
+    if (statusEl) {
+      statusEl.textContent = "Stream interrupted — click Find contacts on website again.";
+      statusEl.setAttribute("data-level", "warn");
+    }
+  };
+})();
+</script>
 {% endblock %}
