@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import UUID
@@ -35,6 +36,13 @@ from app.services.fetcher import Fetcher, FetchResult
 
 logger = logging.getLogger(__name__)
 
+ProgressFn = Callable[[str, str], None]
+
+
+def _emit(on_progress: ProgressFn | None, level: str, message: str) -> None:
+    if on_progress is not None:
+        on_progress(level, message)
+
 
 @dataclass
 class DiscoverContactsResult:
@@ -48,6 +56,8 @@ class DiscoverContactsResult:
     channels_added: int = 0
     errors: list[str] = field(default_factory=list)
     message: str = ""
+    # Human-readable findings for live UI logs (name, role, email?, action).
+    findings: list[dict[str, str]] = field(default_factory=list)
 
 
 def discover_contacts_for_company(
@@ -57,6 +67,7 @@ def discover_contacts_for_company(
     fetcher: Fetcher | None = None,
     max_urls: int = 12,
     refresh: bool = False,
+    on_progress: ProgressFn | None = None,
 ) -> DiscoverContactsResult:
     """Fetch permitted people pages and upsert contacts. Partial success is OK."""
     company = session.scalar(
@@ -72,17 +83,26 @@ def discover_contacts_for_company(
     fetcher = fetcher or Fetcher()
     try:
         urls = candidate_people_urls(company, list(company.snapshots))[:max_urls]
+        _emit(
+            on_progress,
+            "info",
+            f"Planning {len(urls)} page(s) on {company.domain}",
+        )
         # Always re-scan existing permitted snapshots (idempotent merge).
-        _ingest_existing_snapshots(session, company, result)
+        _emit(on_progress, "info", "Reading pages already saved for this company…")
+        _ingest_existing_snapshots(session, company, result, on_progress=on_progress)
 
-        for url in urls:
+        total = len(urls)
+        for idx, url in enumerate(urls, start=1):
             result.urls_tried += 1
+            _emit(on_progress, "info", f"Looking [{idx}/{total}] {url}")
             try:
                 assert_fetch_allowed(url)
                 assert_public_http_url(url)
             except (BuyerGuardrailError, UnsafeUrlError) as exc:
                 result.urls_failed += 1
                 result.errors.append(str(exc))
+                _emit(on_progress, "warn", f"Skipped {url} — {exc}")
                 continue
 
             latest = _latest_snapshot(session, company.id, url)
@@ -100,6 +120,7 @@ def discover_contacts_for_company(
                     pass
 
             try:
+                _emit(on_progress, "info", f"Fetching {url}")
                 fetch = fetcher.fetch(
                     url, etag=etag, last_modified=last_modified, previous_hash=previous_hash
                 )
@@ -107,19 +128,28 @@ def discover_contacts_for_company(
                 result.urls_failed += 1
                 result.errors.append(f"{url}: {exc}")
                 logger.warning("contact discover fetch failed %s: %s", url, exc)
+                _emit(on_progress, "warn", f"Failed {url} — {exc}")
                 continue
 
             if fetch.blocked_by_robots:
                 result.urls_failed += 1
                 result.errors.append(f"{url}: blocked by robots.txt")
+                _emit(on_progress, "warn", f"Blocked by robots.txt — {url}")
                 continue
             if not fetch.ok:
                 result.urls_failed += 1
                 result.errors.append(f"{url}: {fetch.error or 'fetch failed'}")
+                _emit(
+                    on_progress,
+                    "warn",
+                    f"HTTP {fetch.http_status or '?'} — {url}",
+                )
                 continue
             if fetch.not_modified or not fetch.changed:
                 result.urls_skipped_unchanged += 1
+                _emit(on_progress, "info", f"Unchanged — re-reading saved text · {url}")
                 if latest:
+                    before = result.people_created + result.people_enriched
                     _apply_text(
                         session,
                         company,
@@ -128,11 +158,16 @@ def discover_contacts_for_company(
                         snapshot=latest,
                         result=result,
                     )
+                    found = (result.people_created + result.people_enriched) - before
+                    if found:
+                        _emit(on_progress, "ok", f"Found {found} contact hit(s) on {url}")
                 continue
 
             result.urls_fetched += 1
+            _emit(on_progress, "info", f"Extracting contacts from {url}")
             snapshot = _persist_snapshot(session, company, fetch, previous_hash=previous_hash)
             if snapshot and fetch.extracted:
+                before = result.people_created + result.people_enriched
                 _apply_text(
                     session,
                     company,
@@ -141,6 +176,11 @@ def discover_contacts_for_company(
                     snapshot=snapshot,
                     result=result,
                 )
+                found = (result.people_created + result.people_enriched) - before
+                if found:
+                    _emit(on_progress, "ok", f"Found {found} contact hit(s) on {url}")
+                else:
+                    _emit(on_progress, "info", f"No named contacts on {url}")
     finally:
         if owns_fetcher:
             fetcher.close()
@@ -150,8 +190,34 @@ def discover_contacts_for_company(
         f"{result.channels_added} company channels; "
         f"fetched {result.urls_fetched}/{result.urls_tried} pages"
     )
+    _emit_findings_summary(on_progress, result)
+    _emit(on_progress, "ok", result.message)
     session.flush()
     return result
+
+
+def _emit_findings_summary(
+    on_progress: ProgressFn | None, result: DiscoverContactsResult
+) -> None:
+    if not result.findings:
+        _emit(on_progress, "info", "Findings: no named contacts on public pages")
+        return
+    _emit(on_progress, "ok", f"Findings: {len(result.findings)} contact(s)")
+    for item in result.findings[:20]:
+        bits = [item.get("name") or "?", item.get("role") or ""]
+        line = " — ".join(b for b in bits if b)
+        if item.get("email"):
+            line += f" · {item['email']}"
+        action = item.get("action") or ""
+        if action:
+            line += f" ({action})"
+        _emit(on_progress, "ok", f"· {line}")
+    if len(result.findings) > 20:
+        _emit(
+            on_progress,
+            "info",
+            f"· …and {len(result.findings) - 20} more",
+        )
 
 
 def enrich_person(
@@ -265,10 +331,13 @@ def _ingest_existing_snapshots(
     session: Session,
     company: Company,
     result: DiscoverContactsResult,
+    *,
+    on_progress: ProgressFn | None = None,
 ) -> None:
     for snap in company.snapshots:
         if not is_permitted_people_page(snap.url):
             continue
+        _emit(on_progress, "info", f"Reading saved page · {snap.url}")
         _apply_text(
             session,
             company,
@@ -289,7 +358,7 @@ def _apply_text(
     result: DiscoverContactsResult,
 ) -> None:
     for extracted in extract_people_from_text(text, company_domain=company.domain):
-        _person, created = upsert_person_from_extraction(
+        person, created = upsert_person_from_extraction(
             session,
             company=company,
             extracted=extracted,
@@ -298,8 +367,24 @@ def _apply_text(
         )
         if created:
             result.people_created += 1
+            action = "new"
         else:
             result.people_enriched += 1
+            action = "updated"
+        finding = {
+            "name": person.name or extracted.name or "?",
+            "role": person.role or extracted.role or "",
+            "action": action,
+        }
+        if person.public_email:
+            finding["email"] = person.public_email
+        # Dedupe by name+role so re-scans of saved pages don't flood the log.
+        key = f"{finding['name'].casefold()}|{finding['role'].casefold()}"
+        if not any(
+            f"{f.get('name', '').casefold()}|{f.get('role', '').casefold()}" == key
+            for f in result.findings
+        ):
+            result.findings.append(finding)
     for channel in extract_generic_channels(text):
         _row, created = upsert_company_channel(
             session,

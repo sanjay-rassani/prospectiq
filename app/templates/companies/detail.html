@@ -25,7 +25,7 @@
       <button type="submit">Refresh now</button>
     </form>
     <form method="post" action="/companies/{{ company.id }}/delete"
-          onsubmit="return confirm('Delete this company and all related data? This cannot be undone.');">
+          data-confirm="Delete this company and all related data? This cannot be undone.">
       <button type="submit" class="outline contrast">Delete company</button>
     </form>
   </div>
@@ -81,7 +81,7 @@
   {% if company.facts_json %}
   <p>
     <small>
-      Extracted {{ company.facts_extracted_at or "—" }}
+      Extracted {{ company.facts_extracted_at | when }}
       {% if company.facts_snapshot_id %}
       · from <a href="#snap-{{ company.facts_snapshot_id }}">source snapshot</a>
       {% endif %}
@@ -326,7 +326,7 @@
     <tbody>
       {% for snap in company.snapshots %}
       <tr{% if company.facts_snapshot_id == snap.id %} class="facts-source"{% endif %}>
-        <td>{{ snap.fetched_at }}</td>
+        <td>{{ snap.fetched_at | when }}</td>
         <td>{{ snap.source_type }}</td>
         <td>
           <a href="#snap-{{ snap.id }}">{{ snap.title or snap.url }}</a>
@@ -353,8 +353,8 @@
     <h3>{{ snap.title or snap.url }}</h3>
     <p>
       <small>
-        {{ snap.url }} · {{ snap.fetched_at }}
-        {% if snap.published_at %} · published {{ snap.published_at }}{% endif %}
+        {{ snap.url }} · {{ snap.fetched_at | when }}
+        {% if snap.published_at %} · published {{ snap.published_at | when }}{% endif %}
         · {{ snap.text|length }} chars
       </small>
     </p>

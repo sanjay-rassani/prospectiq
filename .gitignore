@@ -29,6 +29,7 @@ backups/
 *.gguf
 logs/
 *.log
+.cache/
 
 # Editor / OS
 .vscode/

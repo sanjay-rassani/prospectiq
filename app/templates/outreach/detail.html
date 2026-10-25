@@ -39,7 +39,8 @@
     <button type="submit">Save draft</button>
   </form>
   {% if task.status in ['pending_draft', 'draft_ready', 'rejected'] %}
-  <form method="post" action="/outreach/{{ task.id }}/generate-draft">
+  <form method="post" action="/outreach/{{ task.id }}/generate-draft"
+        data-confirm="Generate a new draft with the local model? This may overwrite the current draft text.">
     <button type="submit" class="outline">Generate with local model</button>
   </form>
   {% endif %}
@@ -52,23 +53,26 @@
   <header><strong>Approval</strong></header>
   <p>Approval is operator-only. The system never sends LinkedIn or email.</p>
   {% if task.status == 'draft_ready' or task.status == 'rejected' %}
-  <form method="post" action="/outreach/{{ task.id }}/approve" style="display:inline">
+  <form method="post" action="/outreach/{{ task.id }}/approve" style="display:inline"
+        data-confirm="Approve this draft? You still send it yourself — nothing is sent automatically.">
     <button type="submit">Approve</button>
   </form>
   {% endif %}
   {% if task.status in ['draft_ready', 'approved', 'pending_draft'] %}
-  <form method="post" action="/outreach/{{ task.id }}/reject" style="display:inline">
+  <form method="post" action="/outreach/{{ task.id }}/reject" style="display:inline"
+        data-confirm="Reject this draft?">
     <input type="text" name="reason" required placeholder="Rejection reason">
     <button type="submit" class="secondary">Reject</button>
   </form>
   {% endif %}
   {% if task.status == 'approved' %}
-  <form method="post" action="/outreach/{{ task.id }}/mark-sent">
+  <form method="post" action="/outreach/{{ task.id }}/mark-sent"
+        data-confirm="Confirm you already sent this message outside ProspectIQ?">
     <button type="submit">I sent it — mark sent</button>
   </form>
   {% endif %}
   {% if task.approved_at %}
-  <p><small>Approved at {{ task.approved_at }}</small></p>
+  <p><small>Approved at {{ task.approved_at | when }}</small></p>
   {% endif %}
 </article>
 
@@ -88,13 +92,13 @@
     <tbody>
       {% for item in task.opportunity.interactions %}
       <tr>
-        <td>{{ item.occurred_at }}</td>
+        <td>{{ item.occurred_at | when }}</td>
         <td>{{ item.direction }}</td>
         <td>{{ item.outcome }}</td>
         <td>{{ item.summary }}</td>
         <td>
           {% if item.next_action_at %}
-          {{ item.next_action_at }}
+          {{ item.next_action_at | when }}
           {% if item.next_action_note %} — {{ item.next_action_note }}{% endif %}
           {% else %}
           —

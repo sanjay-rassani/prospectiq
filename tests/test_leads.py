@@ -242,15 +242,121 @@ def test_engine_partial_source_failure(session: Session, monkeypatch: object) ->
     assert stats.errors
 
 
-def test_restricted_sources_listed_not_claimed(client: object) -> None:
+def test_discover_prefs_ajax_save_applies_sources(
+    client: object, monkeypatch: object, tmp_path: object
+) -> None:
+    from pathlib import Path
+
+    from app.services.scoring import profile as profile_mod
+
+    path = Path(str(tmp_path)) / "operator_profile.yaml"
+    path.write_text("positioning: test\ndiscovery: {}\n")
+    monkeypatch.setattr(profile_mod, "DEFAULT_PROFILE_PATH", path)  # type: ignore[attr-defined]
+    monkeypatch.setattr(
+        "app.api.companies.DEFAULT_PROFILE_PATH", path
+    )
+
+    r = client.post(  # type: ignore[attr-defined]
+        "/companies/discover/prefs?ajax=1",
+        data={
+            "focus_preset": "custom",
+            "source_choice": ["hackernews", "contracts_uk", "github_issues"],
+            "engine_choice": ["duckduckgo"],
+            "lead_type": ["project_request"],
+            "service_choice": ["automation"],
+            "industry_choice": ["saas"],
+            "industry_mode": "flexible",
+            "location_choice": ["United Kingdom", "remote"],
+            "include_remote": "on",
+            "required_keywords": "automation",
+            "min_relevance": "30",
+            "prefer_high_intent": "on",
+            "max_new_entries_per_feed": "25",
+            "max_seeds_per_poll": "15",
+        },
+        headers={"Accept": "application/json"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert "hackernews" in body["enabled_sources"]
+    assert "contracts_uk" in body["enabled_sources"]
+    assert "github_issues" in body["enabled_sources"]
+    assert "United Kingdom" in body["geographies"]
+    assert body["required_keywords"] == ["automation"]
+
+    from app.services.scoring.profile import reload_operator_profile
+    from app.services.leads.filters import filters_from_prefs
+
+    profile = reload_operator_profile()
+    filters = filters_from_prefs(profile.discovery, profile)
+    assert "hackernews" in filters.enabled_sources
+    assert "github_issues" in filters.enabled_sources
+    assert filters.required_keywords == ["automation"]
+    assert "United Kingdom" in filters.geographies
+
+
+def test_discover_sources_ui_no_marketplaces(client: object) -> None:
     r = client.get("/companies/discover")  # type: ignore[attr-defined]
     assert r.status_code == 200
     body = r.text
     assert "Services" in body
+    assert "Locations" in body
     assert "Hacker News" in body
     assert "UK Contracts Finder" in body
-    assert "Upwork" in body
-    assert "off" in body.casefold()
+    assert "Your custom sources" in body
+    assert "Search engines" in body
+    assert "Active (hide rejected)" in body
+    assert "Rejected only" in body
+    assert 'value="upwork"' not in body
+    assert 'value="fiverr"' not in body
+    assert 'value="linkedin"' not in body
+    assert "not scraped" in body.casefold()
+
+
+def test_discover_hides_rejected_by_default(session: Session, client: object) -> None:
+    active = DiscoveryLead(
+        source_kind="hackernews",
+        source_name="Hacker News",
+        source_category="p1_intent",
+        listing_id="hn:active-1",
+        canonical_url="https://example.com/active",
+        title="Active lead keep me",
+        description="Need automation",
+        lead_kind=LeadKind.PROJECT.value,
+        intent_class=IntentClass.HIGH_INTENT.value,
+        relevance_score=80,
+        status=LeadStatus.NEW.value,
+        discovered_at=datetime.now(UTC),
+    )
+    rejected = DiscoveryLead(
+        source_kind="hackernews",
+        source_name="Hacker News",
+        source_category="p1_intent",
+        listing_id="hn:rejected-1",
+        canonical_url="https://example.com/rejected",
+        title="Rejected lead hide me",
+        description="Need automation",
+        lead_kind=LeadKind.PROJECT.value,
+        intent_class=IntentClass.HIGH_INTENT.value,
+        relevance_score=90,
+        status=LeadStatus.REJECTED.value,
+        discovered_at=datetime.now(UTC),
+    )
+    session.add_all([active, rejected])
+    session.flush()
+
+    default_page = client.get("/companies/discover")  # type: ignore[attr-defined]
+    assert default_page.status_code == 200
+    assert "Active lead keep me" in default_page.text
+    assert "Rejected lead hide me" not in default_page.text
+
+    rejected_page = client.get(  # type: ignore[attr-defined]
+        "/companies/discover?lead_status=rejected"
+    )
+    assert rejected_page.status_code == 200
+    assert "Rejected lead hide me" in rejected_page.text
+    assert "Active lead keep me" not in rejected_page.text
 
 
 def test_lead_qualify_reject(session: Session, client: object) -> None:
@@ -281,6 +387,67 @@ def test_lead_qualify_reject(session: Session, client: object) -> None:
     assert r2.status_code == 303
     session.refresh(lead)
     assert lead.status == LeadStatus.REJECTED.value
+
+
+def test_leads_bulk_qualify_and_reject(session: Session, client: object) -> None:
+    leads = []
+    for i in range(3):
+        lead = DiscoveryLead(
+            source_kind="hackernews",
+            source_name="Hacker News",
+            source_category="p1_intent",
+            listing_id=f"hn:bulk-{i}",
+            canonical_url=f"https://example.com/bulk-{i}",
+            title=f"Bulk lead {i}",
+            description="Need automation",
+            lead_kind=LeadKind.PROJECT.value,
+            intent_class=IntentClass.HIGH_INTENT.value,
+            relevance_score=70,
+            discovered_at=datetime.now(UTC),
+        )
+        session.add(lead)
+        leads.append(lead)
+    session.flush()
+
+    r = client.post(  # type: ignore[attr-defined]
+        "/leads/bulk",
+        data={
+            "action": "qualify",
+            "lead_id": [str(leads[0].id), str(leads[1].id)],
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    from urllib.parse import unquote
+
+    assert "Bulk OK: 2 lead(s)" in unquote(r.headers.get("location") or "")
+    session.refresh(leads[0])
+    session.refresh(leads[1])
+    session.refresh(leads[2])
+    assert leads[0].status == LeadStatus.QUALIFIED.value
+    assert leads[1].status == LeadStatus.QUALIFIED.value
+    assert leads[2].status == LeadStatus.NEW.value
+
+    r2 = client.post(  # type: ignore[attr-defined]
+        "/leads/bulk",
+        data={
+            "action": "reject",
+            "lead_id": [str(leads[0].id), str(leads[1].id), str(leads[2].id)],
+        },
+        follow_redirects=False,
+    )
+    assert r2.status_code == 303
+    for lead in leads:
+        session.refresh(lead)
+        assert lead.status == LeadStatus.REJECTED.value
+
+    page = client.get("/companies/discover?lead_status=rejected")  # type: ignore[attr-defined]
+    assert page.status_code == 200
+    assert "Bulk lead 0" in page.text
+    active = client.get("/companies/discover")  # type: ignore[attr-defined]
+    assert active.status_code == 200
+    assert "Bulk lead 0" not in active.text
+    assert 'id="leads-bulk-form"' in page.text or "rejected" in page.text.casefold()
 
 
 def test_public_http_still_blocks_loopback() -> None:

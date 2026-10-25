@@ -12,6 +12,19 @@ capabilities:
 - RAG
 - modernization
 preferred_solution_families:
+- backend_api
+- fullstack
+- saas
+- mobile
+- ai_ml
+- llm_rag
+- ai_agents
+- automation
+- data_eng
+- devops
+- modernization
+- integrations
+- custom_software
 - agentic_ai_automation
 - custom_software_saas
 - integrations_apis
@@ -19,24 +32,26 @@ preferred_solution_families:
 - modernization_scale
 - full_stack_product
 target_industries:
-- logistics
-- manufacturing
 - healthcare
 - fintech
+- education
+- ecommerce
 - saas
+- manufacturing
+- logistics
+- real_estate
+- professional_services
+- government
+- nonprofit
 - software
 - professional services
 - retail
-- ecommerce
 target_regions:
+- remote
 - uk
-- united kingdom
 - europe
-- eu
 - us
-- united states
 - north america
-- pakistan
 - uae
 - middle east
 excluded_industries:
@@ -49,10 +64,10 @@ excluded_geographies: []
 do_not_contact_domains: []
 allow_agency_white_label: true
 thresholds:
-  band_high: 75
-  band_medium: 55
-  band_watch: 35
-  outreach_ready_min: 65
+  band_high: 75.0
+  band_medium: 55.0
+  band_watch: 35.0
+  outreach_ready_min: 65.0
 outreach:
   unresponsive_after_touches: 3
   evidence_stale_days: 45
@@ -69,23 +84,82 @@ outreach:
   scheduler_enabled: true
   scheduler_tick_seconds: 60
 discovery:
-  focus_preset: ai_software
-  keywords:
-  - saas
-  - software
-  - AI automation
-  - agentic AI
-  - API
-  - integrations
-  - RAG
-  - data platform
+  focus_preset: custom
+  keywords: &id001 []
+  optional_keywords: *id001
   exclude_keywords:
   - hiring
   - careers
   - jobs
-  use_profile_industries_as_keywords: true
+  - recruiting
+  required_keywords: []
+  use_profile_industries_as_keywords: false
   skip_social_hosts: true
   seed_new_links: true
   only_unknown_domains: true
   max_new_entries_per_feed: 25
   max_seeds_per_poll: 15
+  lead_types:
+  - project_request
+  - company_seeking_dev
+  - startup
+  - sme
+  - enterprise
+  - school
+  - research
+  - government
+  - other
+  services:
+  - backend_api
+  - fullstack
+  - saas
+  - mobile
+  - ai_ml
+  - llm_rag
+  - ai_agents
+  - automation
+  - data_eng
+  - devops
+  - modernization
+  - integrations
+  - custom_software
+  industries:
+  - healthcare
+  - fintech
+  - education
+  - ecommerce
+  - saas
+  - manufacturing
+  - logistics
+  - real_estate
+  - professional_services
+  - government
+  - nonprofit
+  industry_mode: flexible
+  geographies:
+  - remote
+  include_remote: true
+  min_relevance: 30
+  max_age_days: 90
+  enabled_sources:
+  - hackernews
+  - searxng
+  - custom_sources
+  - rss_feeds
+  search_engines:
+  - duckduckgo
+  - brave
+  - bing
+  - google
+  - startpage
+  - qwant
+  use_public_searxng: true
+  custom_sources: []
+  prefer_high_intent: true
+  budget_min: null
+  budget_max: null
+  budget_currency: ''
+models:
+  extraction_model: numind/nuextract3:q4_k_m
+  generation_model: qwen3.5:4b
+  note: Change EXTRACTION_MODEL / GENERATION_MODEL in .env and restart to apply.

@@ -16,10 +16,13 @@ The app is **server-rendered** (FastAPI + Jinja + Pico.css). There is no React/A
 | **Contacts** | Top-center nav | People directory — hover explains |
 | **Outreach** | Top-center nav | Drafts & follow-ups — hover explains (you send) |
 | **Settings** | Top-center nav | Profile, feeds, exports — hover explains |
-| Footer note | Bottom | Reminder that sending is manual |
+| Footer note | Bottom | Reminder that sending is manual; times are PKT + US Eastern in brackets |
+| Datetimes | Everywhere | Filter `when` → e.g. `23 Oct 2026, 11:40 AM PKT (2:40 AM EDT)` |
 | Yellow **flash** | Under page title | One-shot success/error message from last action |
 
 `aria-current="page"` highlights the active nav item. Hover any nav link for a new-user tip (`title=`).
+
+Destructive / special actions use an in-app confirm modal via `data-confirm` on the form (not the browser dialog): delete company/contact, archive, remove feed, reject/approve/mark-sent, lifecycle move, stale check, reject lead, override, generate draft.
 
 ---
 
@@ -73,20 +76,20 @@ Today (see what is due)
 
 ---
 
-## 4. Today (`/`)
+## 4. Today (`/`) — home desk
 
-**Purpose:** What needs attention *now*.
+**Corrected product prompt:** Today is the welcome + attention desk: explain what the app does, put **Discover** / **Seed** / **Settings** up front, show pipeline counts, a short getting-started path (first-run or collapsible guide), then the usual attention lists. Stay in ProspectIQ/Pico styling — not a SaaS marketing landing page.
 
 | Section | Contents | Actions |
 | --- | --- | --- |
-| High-priority opportunities | Table: company, title, opportunity score, status | Click company → company detail; click title → opportunity |
-| Drafts awaiting action | Outreach tasks due for review | Click → `/outreach/{id}` |
-| Follow-ups | Interactions with `next_action_at` due | Click → opportunity |
-| Resurfaced | Companies marked resurfaced after new evidence | Click → company |
-| Content changes (48h) | Snapshots whose content hash changed | Click → company `#snap-…` |
-| Failed jobs | Link at bottom | → `/jobs/failed` |
-
-Empty states: short “nothing yet” messages with links to Discover/Outreach.
+| Hero | What ProspectIQ does (you send; app never auto-sends) | **Discover leads**, **Seed a URL**, **Settings** |
+| Snapshot stats | Priority deals, drafts, follow-ups, companies, contacts, ready | Click → jump to section or list |
+| Welcome / How-to | First-run 3 steps, or collapsible guide for returning users | Links into Settings / Discover / Seed |
+| Action tiles | Discover, Seed, Companies, Outreach | Large clickable areas |
+| High-priority opportunities | Table: company, title, score, status | → company / opportunity |
+| Drafts / follow-ups | Due outreach work | → `/outreach/{id}` or opportunity |
+| Newly changed | Resurfaced + 48h content changes | → company |
+| Footer | Attention count · Failed jobs | → `/jobs/failed` |
 
 ---
 
@@ -124,7 +127,7 @@ Form posts to `POST /companies/discover/prefs` via **Save filters**.
 | **Services** chips | What you sell (Backend/API, SaaS, AI/ML, Automation, …). Used to build search queries and score matches |
 | **Industries** chips | Target industries |
 | **Match** | Flexible = boost industry hits; Strict = drop listings with no industry terms |
-| **Places** | Comma-separated geography (UK, EU, city names…) |
+| **Locations** | Multi-select dropdown of all countries (+ region shortcuts) |
 | **Must include** | Keywords that *must* appear or the lead is discarded |
 | **Allow remote / unknown location** | Keep listings without a clear place |
 | **Min score** | Relevance 0–100; below this is not saved as a lead |
@@ -141,12 +144,15 @@ Form posts to `POST /companies/discover/prefs` via **Save filters**.
 
 ### 6.3 Left: Sources
 
+Built-in adapters only (no marketplace scrapers): Hacker News, UK Contracts Finder, SearXNG, GitHub public issues, RSS/Atom, plus **your custom sources**.
+
 | Control | What it does |
 | --- | --- |
 | Checkboxes next to sources | Enable that adapter for the next Run |
 | Badge **on** | Source is available without extra config |
-| Badge **setup** | Needs env config (e.g. SearXNG) |
-| Badge **off** | Restricted — listed for honesty, **cannot** be searched (Upwork, Fiverr, LinkedIn) |
+| Badge **setup** | Needs env config (e.g. SearXNG URL) |
+| **Search engines** | Which SearXNG engines to query when SearXNG is on. Prefers local `SEARXNG_URL`, then optional public instances from [searx.space](https://searx.space/) (checkbox). Run then **visits public result pages** and scores page text — never scrapes Google HTML. Public instances often block bots; local compose SearXNG is more reliable. |
+| **Your custom sources** | Add public RSS/Atom URLs by name; remove individually; enable via `custom_sources` |
 | Prefer buying intent | Boost high-intent language in scoring |
 | Max / source | Cap candidates pulled per adapter |
 | Max seed | Cap how many domains auto-save into Companies |
@@ -154,27 +160,31 @@ Form posts to `POST /companies/discover/prefs` via **Save filters**.
 | Skip known domains | Do not re-seed domains already in Companies |
 | **Save filters** | Persist all of the above into `config/operator_profile.yaml` |
 
+Marketplaces (Upwork, Fiverr, LinkedIn) are **not** scraped — paste a URL via Seed if you found something manually.
+
 **RSS feeds** (collapsed): list existing feeds; add via suggested dropdown or custom name/URL/kind → `POST /companies/discover/feeds`.
 
 ### 6.4 Right: Run
 
 | Control | What it does |
 | --- | --- |
-| **Run discovery** | Opens SSE stream `GET /companies/discover/poll/stream`. Runs enabled adapters, scores, persists leads. Log appears in the black terminal box. Page reloads when done. |
+| **Run discovery** | First POSTs the current left-panel filters to `/companies/discover/prefs?ajax=1` (so Run always uses what is selected, not only a prior Save), then opens SSE `GET /companies/discover/poll/stream`. Log shows applied filters + progress; page reloads when done. |
+| **Discovery history** | Under the Run log. One run: expands inline. Two or more: opens a popup listing recent polls; expand a row for that run’s log. |
 
-Logs are **not** stored in the database — only visible during the run.
+Live log is also kept on each finished run (stored on a `discover_leads` job row).
 
 ### 6.5 Right: Results
 
 | Control | What it does |
 | --- | --- |
-| Intent / Status dropdowns + **Filter** | Reload page with query params |
+| Intent / Status dropdowns + **Filter** | Reload page with query params. Default status is **Active (hide rejected)**; choose **Rejected only** to review rejects. |
 | Lead title link | Opens original source URL in a new tab |
 | Intent badge | `high` / `potential` / `emerging` / `low` (buying-intent class — **not** ICP Fit) |
 | Score | Relevance 0–100 |
-| **OK** | Mark lead `qualified` |
+| **Select all** / row checkboxes | Choose leads, then bulk **OK** / **Save** / **Reject** |
+| **OK** | Mark lead(s) `qualified` |
 | **Save** | Seed company from domain if possible → open company; else qualify + flash |
-| **Skip** | Mark lead `rejected` (re-discovery will keep rejection) |
+| **Reject** | Mark lead(s) `rejected` (hidden from Active; re-discovery keeps rejection) |
 | **company** link | If already linked to a Company |
 
 Counts: new · qualified · saved · rejected.
@@ -266,7 +276,7 @@ Query `?step=1…5` selects the panel. Default step is inferred (missing contact
 
 | Layer | Control | What it does |
 | --- | --- | --- |
-| **A** | **Find contacts on website** | Queues scan of about/team/contact pages; shows loading spinner; polls `/opportunities/{id}/discover-contacts/status` until done |
+| **A** | **Find contacts on website** | SSE `/opportunities/{id}/discover-contacts/stream` runs the scan and streams a single-line live log (URL currently being fetched) |
 | **A** | **Refresh scan** | Same with refresh=1 |
 | **B** | **Open Google search** | New tab: role + company (+ site:domain) — you research manually |
 | **B** | **Google → LinkedIn profiles** | New tab: `site:linkedin.com/in` search |
@@ -355,14 +365,14 @@ Click a row → draft detail.
 | Section | Controls |
 | --- | --- |
 | **Exports** | Download companies JSON, opportunities CSV, interactions CSV |
-| **Target profile & thresholds** | Positioning, industries, regions, exclusions, solution families, score bands, refresh day intervals, model labels (labels only — real models in `.env`) → **Save profile** |
-| **Adapters** | Read-only registry of source kinds |
-| **Discovery** | Short note on which sources work |
+| **Target profile & thresholds** | Same control style as Discover: industry checkboxes, country multi-select, excluded industries, services/solution-family checkboxes, score bands, refresh intervals, model labels (labels only — real models in `.env`) → **Save profile** |
+| **Company pipeline adapters** | Read-only registry (Seed, RSS, page refresh, …) |
+| **Discover sources** | Read-only list of lead adapters (HN, Contracts UK, SearXNG, GitHub issues, RSS, custom). Enable/configure on Discover |
 | **Feeds** | Per feed: **Poll**, **Toggle**, **Remove**; form to **Add** RSS / github_releases / changelog |
 | **Domain fetch policy** | Opt-in Playwright per domain |
 | **Recent operator feedback** | Good/bad notes from company pages |
 
-Profile file path is shown under the title (`config/operator_profile.yaml`).
+Profile file path is shown under the title (`config/operator_profile.yaml`). Discover filters (sources, engines, lead types) stay on **Discover → Save filters**.
 
 ---
 

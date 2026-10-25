@@ -72,9 +72,24 @@ class DiscoverPrefs(BaseModel):
     required_keywords: list[str] = Field(default_factory=list)
     optional_keywords: list[str] = Field(default_factory=list)
     min_relevance: int = 30
+    # Drop / demote leads older than this many days (0 = no age limit).
+    max_age_days: int = 90
     enabled_sources: list[str] = Field(
-        default_factory=lambda: ["hackernews", "contracts_uk", "rss_feeds"]
+        default_factory=lambda: [
+            "hackernews",
+            "contracts_uk",
+            "rss_feeds",
+            "custom_sources",
+        ]
     )
+    # Engines passed to SearXNG when that adapter is enabled (operator hosts SearXNG).
+    search_engines: list[str] = Field(
+        default_factory=lambda: ["duckduckgo", "brave", "bing"]
+    )
+    # Also query public SearXNG instances from https://searx.space/ (failover).
+    use_public_searxng: bool = True
+    # Operator-added public RSS/Atom feeds: [{name, url, kind}]
+    custom_sources: list[dict[str, str]] = Field(default_factory=list)
     prefer_high_intent: bool = True
     budget_min: float | None = None
     budget_max: float | None = None

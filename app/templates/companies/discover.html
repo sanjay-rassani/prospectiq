@@ -21,19 +21,24 @@
     <form method="post" action="/companies/discover/prefs" id="discover-prefs-form">
       <article>
         <header><strong>Who</strong></header>
-        <label>Preset
-          <select name="focus_preset" id="focus-preset">
+        <fieldset class="choice-fieldset compact">
+          <legend>Preset</legend>
+          <div class="choice-grid">
             {% for key, label in preset_choices %}
-            <option value="{{ key }}" {% if discovery.focus_preset == key %}selected{% endif %}>{{ label }}</option>
+            <label class="checkbox-option">
+              <input type="radio" name="focus_preset" value="{{ key }}" id="focus-preset-{{ key }}"
+                {% if discovery.focus_preset == key %}checked{% endif %}>
+              {{ label }}
+            </label>
             {% endfor %}
-          </select>
-        </label>
+          </div>
+        </fieldset>
 
         <fieldset class="choice-fieldset compact">
           <legend>Type</legend>
           <div class="choice-grid">
             {% for key, label in lead_types %}
-            <label class="choice-chip">
+            <label class="checkbox-option">
               <input type="checkbox" name="lead_type" value="{{ key }}"
                 {% if key.casefold() in selected_lead_types %}checked{% endif %}>
               {{ label }}
@@ -46,7 +51,7 @@
           <legend>Services</legend>
           <div class="choice-grid">
             {% for key, label in services %}
-            <label class="choice-chip">
+            <label class="checkbox-option">
               <input type="checkbox" name="service_choice" value="{{ key }}"
                 {% if key.casefold() in selected_services %}checked{% endif %}>
               {{ label }}
@@ -59,36 +64,73 @@
           <legend>Industries</legend>
           <div class="choice-grid">
             {% for key, label in industries %}
-            <label class="choice-chip">
+            <label class="checkbox-option">
               <input type="checkbox" name="industry_choice" value="{{ key }}"
                 {% if key.casefold() in selected_industries %}checked{% endif %}>
               {{ label }}
             </label>
             {% endfor %}
           </div>
-          <label>Match
-            <select name="industry_mode">
-              <option value="flexible" {% if discovery.industry_mode != 'strict' %}selected{% endif %}>Flexible</option>
-              <option value="strict" {% if discovery.industry_mode == 'strict' %}selected{% endif %}>Strict</option>
-            </select>
-          </label>
+          <fieldset class="choice-fieldset compact">
+            <legend>Match</legend>
+            <div class="choice-grid">
+              <label class="checkbox-option">
+                <input type="radio" name="industry_mode" value="flexible"
+                  {% if discovery.industry_mode != 'strict' %}checked{% endif %}>
+                Flexible
+              </label>
+              <label class="checkbox-option">
+                <input type="radio" name="industry_mode" value="strict"
+                  {% if discovery.industry_mode == 'strict' %}checked{% endif %}>
+                Strict
+              </label>
+            </div>
+          </fieldset>
         </fieldset>
 
-        <label>Places
-          <input type="text" name="geographies" value="{{ discovery.geographies | join(', ') }}"
-            placeholder="UK, EU, remote">
-        </label>
+        <fieldset class="choice-fieldset compact">
+          <legend>Locations</legend>
+          <p class="muted"><small>
+            Hold Ctrl (Windows/Linux) or Cmd (Mac) to select multiple countries.
+          </small></p>
+          <label>Countries
+            <select name="location_choice" multiple size="12" class="location-select">
+              <optgroup label="Regions">
+                {% for key, label in location_regions %}
+                <option value="{{ key }}"
+                  {% if key.casefold() in selected_locations %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </optgroup>
+              <optgroup label="Countries">
+                {% for key, label in location_countries %}
+                <option value="{{ key }}"
+                  {% if key.casefold() in selected_locations %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </optgroup>
+            </select>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="include_remote" value="on"
+              {% if discovery.include_remote %}checked{% endif %}>
+            Allow remote / unknown location
+          </label>
+        </fieldset>
         <label>Must include
           <input type="text" name="required_keywords" value="{{ discovery.required_keywords | join(', ') }}"
             placeholder="automation, CRM">
         </label>
-        <label>
-          <input type="checkbox" name="include_remote" value="on"
-            {% if discovery.include_remote %}checked{% endif %}>
-          Allow remote / unknown location
-        </label>
         <label>Min score
           <input type="number" name="min_relevance" min="0" max="100" value="{{ discovery.min_relevance }}">
+        </label>
+        <label>Freshness
+          <select name="max_age_days">
+            {% set age = discovery.max_age_days if discovery.max_age_days is not none else 90 %}
+            <option value="7" {% if age == 7 %}selected{% endif %}>Last 7 days</option>
+            <option value="30" {% if age == 30 %}selected{% endif %}>Last 30 days</option>
+            <option value="90" {% if age == 90 %}selected{% endif %}>Last 90 days</option>
+            <option value="365" {% if age == 365 %}selected{% endif %}>Last year</option>
+            <option value="0" {% if age == 0 %}selected{% endif %}>Any age</option>
+          </select>
         </label>
 
         <details class="more-filters">
@@ -111,7 +153,7 @@
             <p class="choice-group-label">{{ group_name }}</p>
             <div class="choice-grid">
               {% for item in items %}
-              <label class="choice-chip">
+              <label class="checkbox-option">
                 <input type="checkbox" name="keyword_choice" value="{{ item }}"
                   class="kw-choice"
                   {% if item.casefold() in selected_keywords %}checked{% endif %}>
@@ -132,7 +174,7 @@
             <p class="choice-group-label">{{ group_name }}</p>
             <div class="choice-grid">
               {% for item in items %}
-              <label class="choice-chip">
+              <label class="checkbox-option">
                 <input type="checkbox" name="exclude_choice" value="{{ item }}"
                   class="ex-choice"
                   {% if item.casefold() in selected_excludes %}checked{% endif %}>
@@ -147,12 +189,12 @@
             </label>
           </fieldset>
 
-          <label>
+          <label class="checkbox-option">
             <input type="checkbox" name="use_profile_industries_as_keywords" value="on" id="use-industries"
               {% if discovery.use_profile_industries_as_keywords %}checked{% endif %}>
             Use Settings industries
           </label>
-          <label>
+          <label class="checkbox-option">
             <input type="checkbox" name="skip_social_hosts" value="on"
               {% if discovery.skip_social_hosts %}checked{% endif %}>
             Skip social links
@@ -162,28 +204,91 @@
 
       <article>
         <header><strong>Sources</strong></header>
+        <p class="muted"><small>
+          Only permitted public / self-hosted sources. Marketplaces (Upwork, Fiverr, LinkedIn)
+          are not scraped — paste a URL via Seed if you found something manually.
+        </small></p>
         <ul class="source-list">
           {% for cap in source_capabilities %}
           <li>
-            {% if cap.availability != 'restricted' %}
-            <label class="choice-chip">
+            <label class="checkbox-option">
               <input type="checkbox" name="source_choice" value="{{ cap.key }}"
                 {% if cap.key.casefold() in selected_sources %}checked{% endif %}>
               {{ cap.label }}
             </label>
             {% if cap.availability == 'optional_config' %}
-            <span class="band band-watch">setup</span>
+            <span class="band band-watch" title="{{ cap.requires_config or 'Needs setup' }}">setup</span>
             {% else %}
-            <span class="band band-high">on</span>
+            <span class="band band-high">ready</span>
             {% endif %}
-            {% else %}
-            <span class="muted">{{ cap.label }}</span>
-            <span class="band band-reject">off</span>
-            {% endif %}
+            {% if cap.description %}<br><small class="muted">{{ cap.description }}</small>{% endif %}
           </li>
           {% endfor %}
         </ul>
-        <label>
+
+        <fieldset class="choice-fieldset compact">
+          <legend>Search engines (via SearXNG)</legend>
+          <p class="muted"><small>
+            Used when <strong>SearXNG</strong> is enabled. Prefers local <code>SEARXNG_URL</code>,
+            then optional public instances from
+            <a href="https://searx.space/" target="_blank" rel="noopener">searx.space</a>
+            (directory of community SearXNG servers — many block bots; local is more reliable).
+            Never scrapes Google/Bing HTML itself.
+          </small></p>
+          <div class="choice-grid">
+            {% for key, label in search_engines %}
+            <label class="checkbox-option">
+              <input type="checkbox" name="engine_choice" value="{{ key }}"
+                {% if key.casefold() in selected_engines %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </div>
+          <label class="checkbox-option">
+            <input type="checkbox" name="use_public_searxng" value="on"
+              {% if discovery.use_public_searxng %}checked{% endif %}>
+            Also try public SearXNG instances (searx.space directory)
+          </label>
+        </fieldset>
+
+        <fieldset class="choice-fieldset compact">
+          <legend>Your custom sources</legend>
+          <p class="muted"><small>Add public RSS/Atom feeds (job boards, changelogs, partner blogs).</small></p>
+          {% if custom_sources %}
+          <ul class="source-list">
+            {% for src in custom_sources %}
+            <li>
+              <label class="checkbox-option">
+                <input type="checkbox" name="remove_custom_source" value="{{ src.url }}">
+                Remove
+              </label>
+              <strong>{{ src.name }}</strong>
+              <small class="muted">· {{ src.kind or 'rss' }}</small><br>
+              <small><a href="{{ src.url }}" target="_blank" rel="noopener">{{ src.url }}</a></small>
+              <input type="hidden" name="existing_custom_name" value="{{ src.name }}">
+              <input type="hidden" name="existing_custom_url" value="{{ src.url }}">
+              <input type="hidden" name="existing_custom_kind" value="{{ src.kind or 'rss' }}">
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          <div class="grid">
+            <label>Name
+              <input type="text" name="new_custom_name" placeholder="Niche board feed">
+            </label>
+            <label>Kind
+              <select name="new_custom_kind">
+                <option value="rss">RSS</option>
+                <option value="atom">Atom</option>
+              </select>
+            </label>
+          </div>
+          <label>Feed URL
+            <input type="url" name="new_custom_url" placeholder="https://example.com/feed.xml">
+          </label>
+        </fieldset>
+
+        <label class="checkbox-option">
           <input type="checkbox" name="prefer_high_intent" value="on"
             {% if discovery.prefer_high_intent %}checked{% endif %}>
           Prefer buying intent
@@ -198,17 +303,20 @@
               value="{{ discovery.max_seeds_per_poll }}">
           </label>
         </div>
-        <label>
+        <label class="checkbox-option">
           <input type="checkbox" name="seed_new_links" value="on"
             {% if discovery.seed_new_links %}checked{% endif %}>
           Auto-save company domains
         </label>
-        <label>
+        <label class="checkbox-option">
           <input type="checkbox" name="only_unknown_domains" value="on"
             {% if discovery.only_unknown_domains %}checked{% endif %}>
           Skip known domains
         </label>
         <button type="submit">Save filters</button>
+        <p class="muted"><small>
+          <strong>Run discovery</strong> also saves these filters first, then applies them.
+        </small></p>
       </article>
     </form>
 
@@ -263,6 +371,66 @@
         </div>
       </header>
       <pre id="activity-log" class="terminal-log" aria-live="polite"></pre>
+      {% if discovery_runs %}
+        {% if discovery_runs|length == 1 %}
+        {% set run = discovery_runs[0] %}
+        <details class="discovery-history">
+          <summary>Discovery history (1)</summary>
+          <ul>
+            <li>
+              <details class="discovery-run" open>
+                <summary>
+                  {{ run.at | when }}
+                  <span class="{% if run.ok %}scan-ok{% else %}scan-fail{% endif %}">{{ run.outcome }}</span>
+                </summary>
+                {% if run.log_lines %}
+                <pre class="discovery-run-log">{{ run.log_lines | join('\n') }}</pre>
+                {% else %}
+                <p class="muted"><small>No detailed log stored for this run.</small></p>
+                {% endif %}
+              </details>
+            </li>
+          </ul>
+        </details>
+        {% else %}
+        <p class="discovery-history-trigger">
+          <button type="button" class="linkish" id="discovery-history-open"
+            aria-haspopup="dialog" aria-controls="discovery-history-modal">
+            Discovery history ({{ discovery_runs|length }})
+          </button>
+        </p>
+        <div id="discovery-history-modal" class="discovery-history-modal" hidden>
+          <div class="discovery-history-backdrop" data-discovery-history-close tabindex="-1"></div>
+          <div class="discovery-history-panel" role="dialog" aria-modal="true"
+            aria-labelledby="discovery-history-title">
+            <header class="row">
+              <h2 id="discovery-history-title">Discovery history</h2>
+              <button type="button" class="outline" data-discovery-history-close>Close</button>
+            </header>
+            <p class="muted"><small>{{ discovery_runs|length }} recent runs. Expand one to see its log.</small></p>
+            <ul class="discovery-history-list">
+              {% for run in discovery_runs %}
+              <li>
+                <details class="discovery-run">
+                  <summary>
+                    {{ run.at | when }}
+                    <span class="{% if run.ok %}scan-ok{% else %}scan-fail{% endif %}">{{ run.outcome }}</span>
+                  </summary>
+                  {% if run.log_lines %}
+                  <pre class="discovery-run-log">{{ run.log_lines | join('\n') }}</pre>
+                  {% else %}
+                  <p class="muted"><small>No detailed log stored for this run.</small></p>
+                  {% endif %}
+                </details>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        {% endif %}
+      {% else %}
+      <p class="muted discovery-history-empty"><small>No discovery runs yet. Click Run discovery to start.</small></p>
+      {% endif %}
     </article>
 
     <article>
@@ -290,18 +458,39 @@
           {% endfor %}
         </select>
         <select name="lead_status">
-          <option value="">All status</option>
-          {% for v in ['new', 'qualified', 'saved', 'rejected'] %}
-          <option value="{{ v }}" {% if status_filter == v %}selected{% endif %}>{{ v }}</option>
-          {% endfor %}
+          <option value="" {% if not status_filter %}selected{% endif %}>Active (hide rejected)</option>
+          <option value="new" {% if status_filter == 'new' %}selected{% endif %}>New</option>
+          <option value="qualified" {% if status_filter == 'qualified' %}selected{% endif %}>Qualified</option>
+          <option value="saved" {% if status_filter == 'saved' %}selected{% endif %}>Saved</option>
+          <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected only</option>
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All statuses</option>
         </select>
         <button type="submit" class="outline">Filter</button>
       </form>
 
       {% if leads %}
-      <table>
+      <form method="post" action="/leads/bulk" id="leads-bulk-form">
+        <div class="bulk-bar" id="leads-bulk-bar">
+          <label class="checkbox-option bulk-select-all">
+            <input type="checkbox" id="leads-select-all" title="Select all leads on this page">
+            Select all
+          </label>
+          <span class="muted" id="leads-selected-count">0 selected</span>
+          <div class="bulk-actions">
+            <button type="submit" name="action" value="qualify" class="outline" disabled
+              data-bulk-action>OK</button>
+            <button type="submit" name="action" value="save" class="outline" disabled
+              data-bulk-action>Save</button>
+            <button type="submit" name="action" value="reject" class="outline contrast" disabled
+              data-bulk-action
+              data-confirm="Reject the selected leads?">Reject</button>
+          </div>
+        </div>
+      </form>
+      <table class="leads-table">
         <thead>
           <tr>
+            <th class="col-check"></th>
             <th>Lead</th>
             <th>Intent</th>
             <th>Score</th>
@@ -312,6 +501,12 @@
         <tbody>
           {% for lead in leads %}
           <tr>
+            <td class="col-check">
+              {% if lead.status != 'rejected' %}
+              <input type="checkbox" form="leads-bulk-form" name="lead_id" value="{{ lead.id }}"
+                class="lead-check">
+              {% endif %}
+            </td>
             <td>
               <a href="{{ lead.canonical_url }}" target="_blank" rel="noopener">{{ lead.title }}</a>
               {% if lead.excerpt %}<br><small class="muted">{{ lead.excerpt[:120] }}</small>{% endif %}
@@ -324,11 +519,18 @@
             <td>{{ lead.source_name }}</td>
             <td class="row-actions">
               {% if lead.status != 'rejected' %}
-              <form method="post" action="/leads/{{ lead.id }}/qualify"><button type="submit" class="outline">OK</button></form>
-              <form method="post" action="/leads/{{ lead.id }}/save"><button type="submit" class="outline">Save</button></form>
-              <form method="post" action="/leads/{{ lead.id }}/reject"><button type="submit" class="outline contrast">Skip</button></form>
+              <form method="post" action="/leads/{{ lead.id }}/qualify">
+                <button type="submit" class="outline">OK</button>
+              </form>
+              <form method="post" action="/leads/{{ lead.id }}/save">
+                <button type="submit" class="outline">Save</button>
+              </form>
+              <form method="post" action="/leads/{{ lead.id }}/reject"
+                    data-confirm="Reject this lead?">
+                <button type="submit" class="outline contrast">Reject</button>
+              </form>
               {% else %}
-              <span class="muted">skipped</span>
+              <span class="muted">rejected</span>
               {% endif %}
               {% if lead.company_id %}<a href="/companies/{{ lead.company_id }}">company</a>{% endif %}
             </td>
@@ -385,7 +587,7 @@
 })();
 
 (function () {
-  var presetSelect = document.getElementById("focus-preset");
+  var presetRadios = document.querySelectorAll('input[name="focus_preset"]');
   var presetData = {};
   try {
     presetData = JSON.parse(document.getElementById("preset-data").textContent || "{}");
@@ -399,24 +601,85 @@
     });
   }
 
-  if (presetSelect) {
-    presetSelect.addEventListener("change", function () {
-      var key = presetSelect.value;
-      if (key === "custom" || !presetData[key]) return;
-      var spec = presetData[key];
-      setChecked(".kw-choice", spec.keywords || []);
-      setChecked(".ex-choice", spec.exclude_keywords || []);
-      var ind = document.getElementById("use-industries");
-      if (ind && typeof spec.use_profile_industries_as_keywords === "boolean") {
-        ind.checked = spec.use_profile_industries_as_keywords;
-      }
-    });
+  function applyPreset(key) {
+    if (key === "custom" || !presetData[key]) return;
+    var spec = presetData[key];
+    setChecked(".kw-choice", spec.keywords || []);
+    setChecked(".ex-choice", spec.exclude_keywords || []);
+    var ind = document.getElementById("use-industries");
+    if (ind && typeof spec.use_profile_industries_as_keywords === "boolean") {
+      ind.checked = spec.use_profile_industries_as_keywords;
+    }
   }
+
+  presetRadios.forEach(function (radio) {
+    radio.addEventListener("change", function () {
+      if (radio.checked) applyPreset(radio.value);
+    });
+  });
+})();
+
+(function () {
+  var openBtn = document.getElementById("discovery-history-open");
+  var modal = document.getElementById("discovery-history-modal");
+  if (!openBtn || !modal) return;
+
+  function closeModal() {
+    modal.hidden = true;
+    document.body.classList.remove("discovery-history-open");
+  }
+
+  function openModal() {
+    modal.hidden = false;
+    document.body.classList.add("discovery-history-open");
+    var closeBtn = modal.querySelector("[data-discovery-history-close]");
+    if (closeBtn) closeBtn.focus();
+  }
+
+  openBtn.addEventListener("click", openModal);
+  modal.querySelectorAll("[data-discovery-history-close]").forEach(function (el) {
+    el.addEventListener("click", closeModal);
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (modal.hidden) return;
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      closeModal();
+    }
+  });
+})();
+
+(function () {
+  var selectAll = document.getElementById("leads-select-all");
+  var countEl = document.getElementById("leads-selected-count");
+  var checks = Array.prototype.slice.call(document.querySelectorAll(".lead-check"));
+  var actions = Array.prototype.slice.call(document.querySelectorAll("[data-bulk-action]"));
+  if (!selectAll || !checks.length) return;
+
+  function sync() {
+    var selected = checks.filter(function (el) { return el.checked; }).length;
+    if (countEl) countEl.textContent = selected + " selected";
+    actions.forEach(function (btn) { btn.disabled = selected === 0; });
+    var allOn = selected === checks.length;
+    var noneOn = selected === 0;
+    selectAll.checked = allOn;
+    selectAll.indeterminate = !allOn && !noneOn;
+  }
+
+  selectAll.addEventListener("change", function () {
+    checks.forEach(function (el) { el.checked = selectAll.checked; });
+    sync();
+  });
+  checks.forEach(function (el) {
+    el.addEventListener("change", sync);
+  });
+  sync();
 })();
 
 (function () {
   var btn = document.getElementById("poll-feeds-btn");
   var log = document.getElementById("activity-log");
+  var form = document.getElementById("discover-prefs-form");
   if (!btn || !log) return;
 
   var source = null;
@@ -438,13 +701,7 @@
     btn.textContent = "Run discovery";
   }
 
-  btn.addEventListener("click", function () {
-    if (source) return;
-    log.textContent = "";
-    btn.disabled = true;
-    btn.textContent = "Running…";
-    appendLine("info", "Starting…");
-
+  function startStream() {
     source = new EventSource("/companies/discover/poll/stream");
     source.onmessage = function (ev) {
       var data;
@@ -464,6 +721,44 @@
       appendLine("error", "Connection lost.");
       stop();
     };
+  }
+
+  btn.addEventListener("click", function () {
+    if (source) return;
+    log.textContent = "";
+    btn.disabled = true;
+    btn.textContent = "Saving filters…";
+    appendLine("info", "Saving current filters, then starting discovery…");
+
+    function failSave(msg) {
+      appendLine("error", msg || "Could not save filters.");
+      stop();
+    }
+
+    if (!form) {
+      btn.textContent = "Running…";
+      startStream();
+      return;
+    }
+
+    var body = new FormData(form);
+    fetch("/companies/discover/prefs?ajax=1", {
+      method: "POST",
+      body: body,
+      headers: { "Accept": "application/json" },
+      credentials: "same-origin"
+    }).then(function (res) {
+      if (!res.ok) throw new Error("Save failed (" + res.status + ")");
+      return res.json();
+    }).then(function (data) {
+      if (!data || !data.ok) throw new Error("Save rejected");
+      var sources = (data.enabled_sources || []).join(", ") || "(none)";
+      appendLine("ok", "Filters saved — sources: " + sources);
+      btn.textContent = "Running…";
+      startStream();
+    }).catch(function (err) {
+      failSave(String(err && err.message ? err.message : err));
+    });
   });
 })();
 </script>

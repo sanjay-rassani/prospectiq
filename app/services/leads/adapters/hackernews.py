@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.config import Settings
@@ -14,7 +14,8 @@ from app.services.leads.adapters.base import (
 )
 from app.services.leads.filters import TargetingFilters, build_search_queries
 
-HN_SEARCH = "https://hn.algolia.com/api/v1/search"
+# Newest-first; better for live buying requests than relevance-only search.
+HN_SEARCH = "https://hn.algolia.com/api/v1/search_by_date"
 
 
 class HackerNewsAdapter:
@@ -54,13 +55,21 @@ class HackerNewsAdapter:
             queries = build_search_queries(filters)[:2]
         found: list[RawCandidate] = []
         seen: set[str] = set()
+        max_age = int(getattr(filters, "max_age_days", 0) or 0)
+        cutoff_i: int | None = None
+        if max_age > 0:
+            cutoff_i = int((datetime.now(UTC) - timedelta(days=max_age)).timestamp())
+
         for query in queries:
-            emit(on_progress, "info", f'HN search: “{query.text}”')  # type: ignore[arg-type]
-            params = {
+            age_note = f" · last {max_age}d" if max_age > 0 else ""
+            emit(on_progress, "info", f'HN search: “{query.text}”{age_note}')  # type: ignore[arg-type]
+            params: dict[str, str] = {
                 "query": query.text,
                 "tags": "story",
                 "hitsPerPage": str(min(limit, 20)),
             }
+            if cutoff_i is not None:
+                params["numericFilters"] = f"created_at_i>{cutoff_i}"
             try:
                 fetcher.rate_limiter.acquire("hn.algolia.com")
                 try:

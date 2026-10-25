@@ -46,7 +46,7 @@
   {% if running %}
   <ul>
     {% for job in running %}
-    <li>{{ job.job_type }} · locked {{ job.locked_at }} · attempt {{ job.attempts }}</li>
+    <li>{{ job.job_type }} · locked {{ job.locked_at | when }} · attempt {{ job.attempts }}</li>
     {% endfor %}
   </ul>
   {% else %}

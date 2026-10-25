@@ -375,7 +375,7 @@ def test_discover_job_handler(session: Session) -> None:
     # Run handler with offline network path (max_urls 0 → snapshots only)
     job.status = JobStatus.RUNNING.value
     msg = handle_job(session, job)
-    assert "Contacts:" in msg
+    assert "new" in msg.casefold() or "updated" in msg.casefold() or "listed" in msg.casefold()
     from sqlalchemy import select
 
     people = list(session.scalars(select(Person).where(Person.company_id == company.id)).all())
@@ -446,9 +446,12 @@ def test_contacts_filters_and_opportunity_outreach(session: Session, client) -> 
     assert "finding=1" in loc
     assert "step=2" in loc
 
-    r_status = client.get(f"/opportunities/{opp.id}/discover-contacts/status")
-    assert r_status.status_code == 200
-    assert r_status.json()["busy"] is True
+    with client.stream("GET", f"/opportunities/{opp.id}/discover-contacts/stream") as stream:  # type: ignore[attr-defined]
+        assert stream.status_code == 200
+        assert "text/event-stream" in stream.headers.get("content-type", "")
+        chunk = next(stream.iter_bytes())
+        assert b"data:" in chunk
+        assert b"message" in chunk
 
     r_out = client.post(
         f"/opportunities/{opp.id}/outreach",

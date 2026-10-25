@@ -179,6 +179,10 @@ def _handle_poll_feeds(session: Session, job: Job) -> str:
 
 def _handle_discover_contacts(session: Session, job: Job) -> str:
     from app.services.contacts.discover import discover_contacts_for_company
+    from app.services.contacts.scan_history import (
+        attach_outcome_to_job,
+        friendly_success_outcome,
+    )
 
     if job.entity_id is None:
         raise ValueError("discover_contacts requires entity_id (company id)")
@@ -189,24 +193,29 @@ def _handle_discover_contacts(session: Session, job: Job) -> str:
         max_urls=int(payload.get("max_urls") or 12),
         refresh=bool(payload.get("refresh")),
     )
-    if result.errors and result.people_created == 0 and result.people_enriched == 0:
-        # Partial failure with no progress — surface for retry.
-        raise RuntimeError("; ".join(result.errors[:3]))
-    return result.message
+    # Missing about/team pages is a normal empty result, not a hard job failure.
+    outcome = friendly_success_outcome(result)
+    attach_outcome_to_job(job, outcome, result=result)
+    return outcome
 
 
 def _handle_discover_leads(session: Session, job: Job) -> str:
     from app.services.leads.engine import run_lead_discovery
     from app.services.leads.filters import filters_from_prefs
+    from app.services.leads.run_history import attach_discovery_outcome
     from app.services.scoring.profile import get_operator_profile
 
     profile = get_operator_profile()
     filters = filters_from_prefs(profile.discovery, profile)
     stats = run_lead_discovery(session, filters)
-    return (
+    summary = (
         f"leads +{stats.created} updated={stats.updated} "
         f"seeded={stats.seeded} errors={len(stats.errors)}"
     )
+    attach_discovery_outcome(
+        session, job, stats=stats.as_dict(), summary=summary
+    )
+    return summary
 
 
 def ensure_maintenance_jobs(session: Session) -> None:

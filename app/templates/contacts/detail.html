@@ -26,7 +26,7 @@
       <button type="submit" class="outline">Enrich / re-discover</button>
     </form>
     <form method="post" action="/contacts/{{ person.id }}/archive"
-          onsubmit="return confirm('Archive this contact?');">
+          data-confirm="Archive this contact? It will be hidden from active lists.">
       <button type="submit" class="outline">Archive</button>
     </form>
   </div>
@@ -60,9 +60,9 @@
     <dt>Source</dt>
     <dd>{{ person.source }}</dd>
     <dt>Last researched</dt>
-    <dd>{{ person.last_researched_at or "—" }}</dd>
+    <dd>{{ person.last_researched_at | when }}</dd>
     <dt>Verified at</dt>
-    <dd>{{ person.verified_at or "—" }}</dd>
+    <dd>{{ person.verified_at | when }}</dd>
   </dl>
   <p class="muted"><small>
     Email labels are evidence strength, not inbox deliverability. Hover a label for what it means.
@@ -136,7 +136,7 @@
 </article>
 
 <form method="post" action="/contacts/{{ person.id }}/delete"
-      onsubmit="return confirm('Permanently delete this contact?');">
+      data-confirm="Permanently delete this contact? This cannot be undone.">
   <button type="submit" class="outline contrast">Delete permanently</button>
 </form>
 {% endblock %}

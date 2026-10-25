@@ -144,7 +144,7 @@ FIELD_EVIDENCE: dict[str, Term] = {
 LEAD_STATUS: dict[str, Term] = {
     "new": Term("New", "Fresh discovery result — not reviewed yet."),
     "qualified": Term("OK / qualified", "You marked this lead as interesting."),
-    "rejected": Term("Skipped", "You rejected this lead."),
+    "rejected": Term("Rejected", "You rejected this lead — hidden from Active by default."),
     "saved": Term("Saved as company", "Linked or seeded into Companies."),
 }
 

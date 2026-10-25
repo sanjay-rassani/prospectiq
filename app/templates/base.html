@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
   <script src="{{ url_for('static', path='/htmx.min.js') }}" defer></script>
 </head>
-<body>
+<body class="{% if active %}page-{{ active }}{% endif %}">
   <header class="container site-header">
     <a class="site-brand" href="/" title="Go to Today — your daily home desk">
       <span class="site-mark" aria-hidden="true">
@@ -65,7 +65,92 @@
   </main>
 
   <footer class="container">
-    <small>Local-only. Research and drafts are suggestions; you decide and you send.</small>
+    <small>
+      Local-only. Research and drafts are suggestions; you decide and you send.
+      · Times show Pakistan (PKT), with US Eastern in brackets.
+    </small>
   </footer>
+
+  <div id="app-confirm" class="app-confirm" hidden>
+    <div class="app-confirm-backdrop" data-confirm-cancel tabindex="-1"></div>
+    <div class="app-confirm-panel" role="dialog" aria-modal="true" aria-labelledby="app-confirm-title">
+      <h2 id="app-confirm-title">Please confirm</h2>
+      <p id="app-confirm-message"></p>
+      <div class="app-confirm-actions">
+        <button type="button" class="outline" data-confirm-cancel>Cancel</button>
+        <button type="button" class="contrast" id="app-confirm-ok">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    var overlay = document.getElementById("app-confirm");
+    var msgEl = document.getElementById("app-confirm-message");
+    var okBtn = document.getElementById("app-confirm-ok");
+    if (!overlay || !msgEl || !okBtn) return;
+
+    var pending = null;
+
+    function closeModal() {
+      overlay.hidden = true;
+      pending = null;
+      document.body.classList.remove("app-confirm-open");
+    }
+
+    function openModal(message, form, submitter) {
+      pending = { form: form, submitter: submitter };
+      msgEl.textContent = message;
+      overlay.hidden = false;
+      document.body.classList.add("app-confirm-open");
+      okBtn.focus();
+    }
+
+    overlay.querySelectorAll("[data-confirm-cancel]").forEach(function (el) {
+      el.addEventListener("click", function () { closeModal(); });
+    });
+
+    okBtn.addEventListener("click", function () {
+      if (!pending) return;
+      var form = pending.form;
+      var submitter = pending.submitter;
+      closeModal();
+      if (typeof form.requestSubmit === "function") {
+        form.dataset.confirmAccepted = "1";
+        if (submitter) form.requestSubmit(submitter);
+        else form.requestSubmit();
+      } else {
+        form.dataset.confirmAccepted = "1";
+        form.submit();
+      }
+    });
+
+    document.addEventListener("keydown", function (ev) {
+      if (overlay.hidden) return;
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        closeModal();
+      }
+    });
+
+    document.addEventListener("submit", function (ev) {
+      var form = ev.target;
+      if (!form || form.tagName !== "FORM") return;
+      if (form.dataset.confirmAccepted === "1") {
+        delete form.dataset.confirmAccepted;
+        return;
+      }
+      var msg = form.getAttribute("data-confirm");
+      var submitter = ev.submitter;
+      if (submitter && submitter.getAttribute("data-confirm")) {
+        msg = submitter.getAttribute("data-confirm");
+      }
+      if (!msg) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      openModal(msg, form, submitter || null);
+    }, true);
+  })();
+  </script>
 </body>
 </html>

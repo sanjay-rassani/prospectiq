@@ -130,7 +130,8 @@
     {% elif opportunity.status != 'outreach_ready' %}
     <details class="more-filters">
       <summary>Advanced: force outreach-ready</summary>
-      <form method="post" action="/opportunities/{{ opportunity.id }}/override-outreach-ready">
+      <form method="post" action="/opportunities/{{ opportunity.id }}/override-outreach-ready"
+            data-confirm="Force this opportunity to Ready to approach despite blockers?">
         <label>
           Reason (required)
           <input type="text" name="reason" required placeholder="Why promote despite blockers?">
@@ -215,12 +216,13 @@
     </div>
 
     {% if finding %}
-    <div class="find-loading" id="find-loading" aria-live="polite" data-status-url="/opportunities/{{ opportunity.id }}/discover-contacts/status">
+    <div class="find-loading" id="find-loading" aria-live="polite"
+         data-stream-url="/opportunities/{{ opportunity.id }}/discover-contacts/stream{% if refresh_scan %}?refresh=1{% endif %}">
       <div class="find-spinner" aria-hidden="true"></div>
-      <div>
+      <div class="find-loading-body">
         <strong>Scanning company website…</strong>
-        <p class="muted">Reading about / team / contact pages for public names and emails. This usually takes a short while.</p>
-        <p class="muted" id="find-loading-status">Status: {{ discovery_status.status | status_badge('job') }}</p>
+        <p class="find-log" id="find-loading-status" title="Live progress">Starting…</p>
+        <ul class="find-findings" id="find-findings" hidden></ul>
       </div>
     </div>
     {% endif %}
@@ -248,6 +250,21 @@
             <button type="submit" class="outline" {% if finding %}disabled{% endif %}>Refresh scan</button>
           </form>
         </div>
+        {% if previous_scans %}
+        <details class="previous-scans">
+          <summary>Previous scans ({{ previous_scans|length }})</summary>
+          <ul>
+            {% for scan in previous_scans %}
+            <li>
+              {{ scan.at | when }}
+              <span class="{% if scan.ok %}scan-ok{% else %}scan-fail{% endif %}">{{ scan.outcome }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </details>
+        {% else %}
+        <p class="muted previous-scans-empty"><small>No previous website scans yet.</small></p>
+        {% endif %}
       </div>
 
       <div class="find-layer">
@@ -440,7 +457,7 @@
       {% for task in outreach_tasks %}
       <li>
         <a href="/outreach/{{ task.id }}">{{ task.channel | status_label('channel') }} · {{ task.status | status_badge('outreach') }}</a>
-        {% if task.due_at %} · due {{ task.due_at }}{% endif %}
+        {% if task.due_at %} · due {{ task.due_at | when }}{% endif %}
       </li>
       {% endfor %}
     </ul>
@@ -477,14 +494,14 @@
       <tbody>
         {% for item in opportunity.interactions %}
         <tr>
-          <td>{{ item.occurred_at }}</td>
+          <td>{{ item.occurred_at | when }}</td>
           <td>{{ item.direction }}</td>
           <td>{{ item.channel }}</td>
           <td>{{ item.outcome }}</td>
           <td>{{ item.summary }}</td>
           <td>
             {% if item.next_action_at %}
-            <strong>{{ item.next_action_at }}</strong>
+            <strong>{{ item.next_action_at | when }}</strong>
             {% if item.next_action_note %} — {{ item.next_action_note }}{% endif %}
             {% else %}—{% endif %}
           </td>
@@ -542,7 +559,8 @@
       Change pipeline status or re-check whether the evidence is too old to act on.
     </p>
 
-    <form method="post" action="/opportunities/{{ opportunity.id }}/lifecycle" style="display:inline">
+    <form method="post" action="/opportunities/{{ opportunity.id }}/lifecycle" style="display:inline"
+          data-confirm="Change this opportunity's lifecycle status?">
       <label>
         Lifecycle status
         <select name="status">
@@ -556,7 +574,8 @@
       </label>
       <button type="submit" class="secondary">Move status</button>
     </form>
-    <form method="post" action="/opportunities/{{ opportunity.id }}/check-stale" style="display:inline">
+    <form method="post" action="/opportunities/{{ opportunity.id }}/check-stale" style="display:inline"
+          data-confirm="Check for stale evidence? This may stop outreach if signals are too old.">
       <button type="submit" class="outline">Check stale evidence</button>
     </form>
   </article>
@@ -603,45 +622,122 @@
   var box = document.getElementById("find-loading");
   if (!box) return;
   var statusEl = document.getElementById("find-loading-status");
-  var url = box.getAttribute("data-status-url");
-  var startedCount = null;
-  var ticks = 0;
+  var findingsEl = document.getElementById("find-findings");
+  var url = box.getAttribute("data-stream-url");
+  if (!url || typeof EventSource === "undefined") return;
 
-  function poll() {
-    ticks += 1;
-    fetch(url, { headers: { Accept: "application/json" } })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (statusEl) {
-          statusEl.textContent = "Status: " + (data.status || "unknown")
-            + (typeof data.people_count === "number" ? " · " + data.people_count + " people on file" : "");
-        }
-        if (startedCount === null && typeof data.people_count === "number") {
-          startedCount = data.people_count;
-        }
-        if (!data.busy) {
-          var grew = typeof data.people_count === "number" && startedCount !== null && data.people_count > startedCount;
-          var done = data.status === "done" || data.status === "failed" || data.status === "idle";
-          if (done || grew || ticks > 90) {
-            var dest = new URL(window.location.href);
-            dest.searchParams.set("step", "2");
-            dest.searchParams.delete("finding");
-            if (data.status === "failed") {
-              dest.searchParams.set("flash", "Contact scan failed — try again or use Google / LinkedIn layers.");
-            } else if (grew || (data.people_count || 0) > 0) {
-              dest.searchParams.set("flash", "Contact scan finished.");
-            } else {
-              dest.searchParams.set("flash", "Scan finished — no public contacts found. Try Google or LinkedIn layers.");
-            }
-            window.location.href = dest.toString();
-            return;
-          }
-        }
-        setTimeout(poll, 2000);
-      })
-      .catch(function () { setTimeout(poll, 3000); });
+  var startedCount = null;
+  var source = new EventSource(url);
+  var finished = false;
+  var logLines = [];
+
+  function showFindings(list) {
+    if (!findingsEl) return;
+    findingsEl.innerHTML = "";
+    if (!list || !list.length) {
+      findingsEl.hidden = true;
+      return;
+    }
+    findingsEl.hidden = false;
+    var title = document.createElement("li");
+    title.className = "find-findings-title";
+    title.textContent = "Findings (" + list.length + ")";
+    findingsEl.appendChild(title);
+    list.slice(0, 20).forEach(function (item) {
+      var li = document.createElement("li");
+      var label = (item.name || "?") + (item.role ? " — " + item.role : "");
+      if (item.email) label += " · " + item.email;
+      if (item.action) label += " (" + item.action + ")";
+      li.textContent = label;
+      findingsEl.appendChild(li);
+    });
+    if (list.length > 20) {
+      var more = document.createElement("li");
+      more.textContent = "…and " + (list.length - 20) + " more";
+      findingsEl.appendChild(more);
+    }
   }
-  setTimeout(poll, 1500);
+
+  function finish(data) {
+    if (finished) return;
+    finished = true;
+    try { source.close(); } catch (e) {}
+    if (data.findings) showFindings(data.findings);
+    if (statusEl) {
+      statusEl.textContent = data.message || "Scan finished.";
+      statusEl.setAttribute("data-level", data.status === "failed" ? "error" : "ok");
+    }
+    var dest = new URL(window.location.href);
+    dest.searchParams.set("step", "2");
+    dest.searchParams.delete("finding");
+    dest.searchParams.delete("refresh");
+    var grew = typeof data.people_count === "number"
+      && startedCount !== null
+      && data.people_count > startedCount;
+    var created = data.created || 0;
+    var nFindings = (data.findings && data.findings.length) || 0;
+    if (data.status === "failed" || data.level === "error") {
+      dest.searchParams.set("flash", data.message || "Contact scan failed — try again or use Google / LinkedIn layers.");
+    } else if (grew || created > 0 || nFindings > 0 || (data.people_count || 0) > 0) {
+      var flash = data.message || "Contact scan finished.";
+      if (nFindings > 0) {
+        flash += " · " + nFindings + " listed above.";
+      }
+      dest.searchParams.set("flash", flash);
+    } else {
+      dest.searchParams.set("flash", "Scan finished — no public contacts found. Try Google or LinkedIn layers.");
+    }
+    // Pause so the findings list is readable before reload.
+    setTimeout(function () { window.location.href = dest.toString(); }, nFindings ? 2800 : 900);
+  }
+
+  source.onmessage = function (ev) {
+    var data;
+    try { data = JSON.parse(ev.data); } catch (e) { return; }
+    if (typeof data.started_count === "number" && startedCount === null) {
+      startedCount = data.started_count;
+    }
+    if (statusEl && data.message) {
+      statusEl.textContent = data.message;
+      statusEl.setAttribute("title", data.message);
+      statusEl.setAttribute("data-level", data.level || "info");
+      if (data.message.indexOf("Findings:") === 0 || data.message.indexOf("· ") === 0) {
+        logLines.push(data.message);
+        if (findingsEl && data.message.indexOf("· ") === 0) {
+          findingsEl.hidden = false;
+          if (!findingsEl.querySelector(".find-findings-title")) {
+            var t = document.createElement("li");
+            t.className = "find-findings-title";
+            t.textContent = "Findings";
+            findingsEl.appendChild(t);
+          }
+          var li = document.createElement("li");
+          li.textContent = data.message.replace(/^·\s*/, "");
+          findingsEl.appendChild(li);
+        } else if (findingsEl && data.message.indexOf("Findings:") === 0) {
+          findingsEl.hidden = false;
+          findingsEl.innerHTML = "";
+          var title = document.createElement("li");
+          title.className = "find-findings-title";
+          title.textContent = data.message;
+          findingsEl.appendChild(title);
+        }
+      }
+    }
+    if (data.done || data.level === "done" || data.status === "failed" || data.status === "missing") {
+      finish(data);
+    }
+  };
+
+  source.onerror = function () {
+    if (finished) return;
+    // Avoid EventSource auto-reconnect starting a second scan.
+    try { source.close(); } catch (e) {}
+    if (statusEl) {
+      statusEl.textContent = "Stream interrupted — click Find contacts on website again.";
+      statusEl.setAttribute("data-level", "warn");
+    }
+  };
 })();
 </script>
 {% endblock %}

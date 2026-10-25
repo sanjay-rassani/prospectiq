@@ -31,7 +31,7 @@
         <td><a href="/outreach/{{ task.id }}">{{ task.opportunity.title }}</a></td>
         <td>{{ task.channel | status_badge('channel') }}</td>
         <td>{{ task.status | status_badge('outreach') }}</td>
-        <td>{{ task.due_at or "—" }}</td>
+        <td>{{ task.due_at | when }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -56,7 +56,7 @@
     <tbody>
       {% for item in due_followups %}
       <tr>
-        <td>{{ item.next_action_at }}</td>
+        <td>{{ item.next_action_at | when }}</td>
         <td>{{ item.opportunity.company.name }}</td>
         <td><a href="/opportunities/{{ item.opportunity_id }}">{{ item.opportunity.title }}</a></td>
         <td>{{ item.next_action_note or item.summary }}</td>

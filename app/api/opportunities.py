@@ -2,23 +2,24 @@
 
 from __future__ import annotations
 
+import json
+import logging
+import threading
+from collections.abc import Iterator
+from queue import Queue
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.db.session import get_session
-from app.jobs.queue import enqueue_job
+from app.db.session import SessionLocal, get_session
 from app.models import (
     Company,
     InteractionOutcome,
-    Job,
-    JobStatus,
-    JobType,
     Opportunity,
     OpportunityEvidence,
     Person,
@@ -27,11 +28,19 @@ from app.models import (
 )
 from app.services.buyers.research_links import research_search_links
 from app.services.buyers.research_tasks import find_person_for_role
+from app.services.contacts.discover import discover_contacts_for_company
 from app.services.contacts.relevance import rank_contacts_for_opportunity
+from app.services.contacts.scan_history import list_contact_scans, record_contact_scan
 from app.services.scoring.promotion import override_outreach_ready
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
+
+# Prevent EventSource auto-reconnect from starting a second concurrent scan.
+_active_contact_scans: set[UUID] = set()
+_active_contact_scans_lock = threading.Lock()
 
 
 def get_templates(request: Request) -> Jinja2Templates:
@@ -56,38 +65,6 @@ def _default_step(
     if not has_contacts or open_research:
         return 2
     return 1
-
-
-def _discovery_job_status(session: Session, company_id: UUID) -> dict[str, Any]:
-    job = session.scalar(
-        select(Job)
-        .where(
-            Job.entity_id == company_id,
-            Job.job_type == JobType.DISCOVER_CONTACTS.value,
-            Job.status.in_([JobStatus.PENDING.value, JobStatus.RUNNING.value]),
-        )
-        .order_by(Job.created_at.desc())
-        .limit(1)
-    )
-    if job is not None:
-        return {"status": job.status, "busy": True, "job_id": str(job.id)}
-    latest = session.scalar(
-        select(Job)
-        .where(
-            Job.entity_id == company_id,
-            Job.job_type == JobType.DISCOVER_CONTACTS.value,
-        )
-        .order_by(Job.created_at.desc())
-        .limit(1)
-    )
-    if latest is None:
-        return {"status": "idle", "busy": False, "job_id": None}
-    return {
-        "status": latest.status,
-        "busy": False,
-        "job_id": str(latest.id),
-        "error": latest.last_error,
-    }
 
 
 @router.get("/opportunities/{opportunity_id}", response_class=HTMLResponse)
@@ -142,7 +119,7 @@ def opportunity_detail(
             open_research=bool(open_tasks),
         )
     finding = request.query_params.get("finding", "") == "1"
-    discovery = _discovery_job_status(session, opportunity.company_id)
+    refresh_scan = request.query_params.get("refresh", "") == "1"
     return templates.TemplateResponse(
         request=request,
         name="opportunities/detail.html",
@@ -159,9 +136,12 @@ def opportunity_detail(
                 opportunity.company, opportunity.buyer_role
             ),
             "step": step,
-            "finding": finding or discovery["busy"],
-            "discovery_status": discovery,
+            "finding": finding,
+            "refresh_scan": refresh_scan,
             "has_contacts": has_contacts,
+            "previous_scans": list_contact_scans(
+                session, opportunity.company_id, limit=8
+            ),
             "flash": request.query_params.get("flash"),
         },
     )
@@ -173,47 +153,186 @@ def opportunity_discover_contacts(
     opportunity_id: UUID,
     refresh: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
+    """Kick the loading UI; the SSE stream runs the actual scan with live logs."""
     opportunity = session.get(Opportunity, opportunity_id)
     if opportunity is None:
         return RedirectResponse(url="/companies?flash=Opportunity not found", status_code=303)
-    enqueue_job(
-        session,
-        JobType.DISCOVER_CONTACTS.value,
-        entity_id=opportunity.company_id,
-        payload={"refresh": refresh == "1"},
-        dedupe_pending=True,
-    )
+    refresh_q = "&refresh=1" if refresh == "1" else ""
     return RedirectResponse(
         url=(
             f"/opportunities/{opportunity_id}"
-            "?step=2&finding=1&flash=Scanning company website for contacts…"
+            f"?step=2&finding=1{refresh_q}"
+            "&flash=Scanning company website for contacts…"
         ),
         status_code=303,
     )
 
 
-@router.get("/opportunities/{opportunity_id}/discover-contacts/status")
-def opportunity_discover_contacts_status(
-    session: SessionDep,
-    opportunity_id: UUID,
-) -> JSONResponse:
-    opportunity = session.get(Opportunity, opportunity_id)
-    if opportunity is None:
-        return JSONResponse({"status": "missing", "busy": False}, status_code=404)
-    people_count = len(
-        [
-            p
-            for p in session.scalars(
-                select(Person).where(
-                    Person.company_id == opportunity.company_id,
-                    Person.archived_at.is_(None),
-                )
-            ).all()
-        ]
+def _people_count(session: Session, company_id: UUID) -> int:
+    return int(
+        session.scalar(
+            select(func.count())
+            .select_from(Person)
+            .where(Person.company_id == company_id, Person.archived_at.is_(None))
+        )
+        or 0
     )
-    payload = _discovery_job_status(session, opportunity.company_id)
-    payload["people_count"] = people_count
-    return JSONResponse(payload)
+
+
+@router.get("/opportunities/{opportunity_id}/discover-contacts/stream")
+def opportunity_discover_contacts_stream(
+    opportunity_id: UUID,
+    refresh: Annotated[str, Query()] = "",
+) -> StreamingResponse:
+    """SSE: run contact discovery and stream one-line progress (where it is looking)."""
+    q: Queue[dict[str, Any] | None] = Queue()
+    do_refresh = refresh == "1"
+
+    def worker() -> None:
+        with _active_contact_scans_lock:
+            if opportunity_id in _active_contact_scans:
+                q.put(
+                    {
+                        "level": "warn",
+                        "message": "A scan is already running for this opportunity…",
+                        "status": "running",
+                        "busy": True,
+                    }
+                )
+                q.put(
+                    {
+                        "level": "done",
+                        "message": "Already scanning — wait for the other tab/stream to finish.",
+                        "status": "done",
+                        "busy": False,
+                        "done": True,
+                        "people_count": 0,
+                        "started_count": 0,
+                    }
+                )
+                q.put(None)
+                return
+            _active_contact_scans.add(opportunity_id)
+
+        session = SessionLocal()
+        try:
+            opportunity = session.get(Opportunity, opportunity_id)
+            if opportunity is None:
+                q.put(
+                    {
+                        "level": "error",
+                        "message": "Opportunity not found",
+                        "status": "missing",
+                        "busy": False,
+                        "done": True,
+                    }
+                )
+                return
+            company_id = opportunity.company_id
+            started = _people_count(session, company_id)
+
+            def on_progress(level: str, message: str) -> None:
+                q.put(
+                    {
+                        "level": level,
+                        "message": message,
+                        "status": "running",
+                        "busy": True,
+                        "people_count": _people_count(session, company_id),
+                        "started_count": started,
+                    }
+                )
+
+            q.put(
+                {
+                    "level": "info",
+                    "message": "Starting website contact scan…",
+                    "status": "running",
+                    "busy": True,
+                    "people_count": started,
+                    "started_count": started,
+                }
+            )
+            result = discover_contacts_for_company(
+                session,
+                company_id,
+                refresh=do_refresh,
+                on_progress=on_progress,
+            )
+            record_contact_scan(
+                session,
+                company_id,
+                result=result,
+                outcome=result.message,
+                ok=True,
+                source="opportunity_stream",
+            )
+            session.commit()
+            findings = list(result.findings)
+            q.put(
+                {
+                    "level": "done",
+                    "message": result.message,
+                    "status": "done",
+                    "busy": False,
+                    "done": True,
+                    "people_count": _people_count(session, company_id),
+                    "started_count": started,
+                    "created": result.people_created,
+                    "enriched": result.people_enriched,
+                    "findings": findings,
+                }
+            )
+        except Exception as exc:
+            session.rollback()
+            logger.exception("contact discover stream failed")
+            try:
+                opportunity = session.get(Opportunity, opportunity_id)
+                if opportunity is not None:
+                    record_contact_scan(
+                        session,
+                        opportunity.company_id,
+                        outcome=f"Scan failed: {exc}",
+                        ok=False,
+                        error=str(exc),
+                        source="opportunity_stream",
+                    )
+                    session.commit()
+            except Exception:  # noqa: BLE001
+                session.rollback()
+            q.put(
+                {
+                    "level": "error",
+                    "message": f"Scan failed: {exc}",
+                    "status": "failed",
+                    "busy": False,
+                    "done": True,
+                }
+            )
+        finally:
+            with _active_contact_scans_lock:
+                _active_contact_scans.discard(opportunity_id)
+            session.close()
+            q.put(None)
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    def events() -> Iterator[str]:
+        while True:
+            item = q.get()
+            if item is None:
+                break
+            yield f"data: {json.dumps(item, default=str)}\n\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/opportunities/{opportunity_id}/override-outreach-ready")

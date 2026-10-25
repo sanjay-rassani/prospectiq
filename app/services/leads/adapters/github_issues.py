@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from app.config import Settings
 from app.services.fetcher import Fetcher
 from app.services.leads.adapters.base import (
@@ -47,7 +49,11 @@ class GitHubIssuesAdapter:
         queries = build_search_queries(filters, limit=2)
         qtext = queries[0].text if queries else "looking for developer"
         q = f"{qtext} is:issue is:open"
-        emit(on_progress, "info", f"GitHub issues: {q[:80]}")  # type: ignore[arg-type]
+        max_age = int(getattr(filters, "max_age_days", 0) or 0)
+        if max_age > 0:
+            since = (datetime.now(UTC) - timedelta(days=max_age)).date().isoformat()
+            q = f"{q} created:>{since}"
+        emit(on_progress, "info", f"GitHub issues: {q[:100]}")  # type: ignore[arg-type]
         headers = {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
@@ -82,6 +88,9 @@ class GitHubIssuesAdapter:
             if not url or not title:
                 continue
             body = str(item.get("body") or "")
+            published = _parse_github_time(
+                item.get("created_at") or item.get("updated_at")
+            )
             found.append(
                 RawCandidate(
                     source_kind="github_issues",
@@ -92,7 +101,20 @@ class GitHubIssuesAdapter:
                     title=title[:512],
                     description=body[:4000],
                     excerpt=(body or title)[:400],
+                    published_at=published,
                 )
             )
         emit(on_progress, "ok", f"GitHub: {len(found)} open issue(s)")  # type: ignore[arg-type]
         return found
+
+
+def _parse_github_time(raw: object) -> datetime | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        published = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if published.tzinfo is None:
+        published = published.replace(tzinfo=UTC)
+    return published
