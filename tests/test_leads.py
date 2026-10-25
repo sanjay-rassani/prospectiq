@@ -389,6 +389,73 @@ def test_lead_qualify_reject(session: Session, client: object) -> None:
     assert lead.status == LeadStatus.REJECTED.value
 
 
+def test_lead_find_contacts_queues_job(session: Session, client: object) -> None:
+    from sqlalchemy import select
+
+    from app.models import Company, Job, JobType
+    from app.models.person import Person, PersonSource
+
+    company = Company(
+        name="Find Contacts Co",
+        domain="find-contacts.example",
+        industry="SaaS",
+        size_hint="small",
+        description="Test",
+        status="researched",
+        seed_url="https://find-contacts.example/",
+    )
+    session.add(company)
+    session.flush()
+    session.add(
+        Person(
+            company_id=company.id,
+            name="Pat Contact",
+            normalized_name="pat contact",
+            role="CEO",
+            source=PersonSource.MANUAL.value,
+            public_email="pat@find-contacts.example",
+            fields_json={},
+        )
+    )
+    lead = DiscoveryLead(
+        source_kind="searxng",
+        source_name="SearXNG research",
+        source_category="p2_business",
+        listing_id="searx:find-contacts",
+        canonical_url="https://find-contacts.example/about",
+        title="Find Contacts Co needs automation",
+        description="CRM automation buyer",
+        lead_kind=LeadKind.COMPANY.value,
+        intent_class=IntentClass.POTENTIAL.value,
+        relevance_score=60,
+        status=LeadStatus.SAVED.value,
+        company_id=company.id,
+        discovered_at=datetime.now(UTC),
+    )
+    session.add(lead)
+    session.flush()
+
+    page = client.get("/companies/discover")  # type: ignore[attr-defined]
+    assert page.status_code == 200
+    assert "Contact" in page.text
+    assert "Pat Contact" in page.text
+    assert f"/leads/{lead.id}/find-contacts" in page.text
+
+    r = client.post(  # type: ignore[attr-defined]
+        f"/leads/{lead.id}/find-contacts", follow_redirects=False
+    )
+    assert r.status_code == 303
+    jobs = list(
+        session.scalars(
+            select(Job).where(
+                Job.job_type == JobType.DISCOVER_CONTACTS.value,
+                Job.entity_id == company.id,
+            )
+        ).all()
+    )
+    assert jobs
+
+
 def test_leads_bulk_qualify_and_reject(session: Session, client: object) -> None:
     leads = []
     for i in range(3):

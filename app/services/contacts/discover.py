@@ -30,7 +30,11 @@ from app.services.contacts.merge import (
     upsert_person_from_extraction,
 )
 from app.services.contacts.normalize import is_generic_inbox
-from app.services.contacts.pages import candidate_people_urls
+from app.services.contacts.pages import (
+    candidate_people_urls,
+    company_base_url,
+    harvest_people_links_from_text,
+)
 from app.services.contacts.ssrf import UnsafeUrlError, assert_public_http_url
 from app.services.fetcher import Fetcher, FetchResult
 
@@ -82,7 +86,14 @@ def discover_contacts_for_company(
     owns_fetcher = fetcher is None
     fetcher = fetcher or Fetcher()
     try:
-        urls = candidate_people_urls(company, list(company.snapshots))[:max_urls]
+        # max_urls<=0 → snapshot-only (tests / offline). Otherwise allow room for
+        # homepage + team/about + links harvested from those pages.
+        plan_cap = 0 if max_urls <= 0 else max(max_urls, 16)
+        urls = (
+            candidate_people_urls(company, list(company.snapshots))[:plan_cap]
+            if plan_cap
+            else []
+        )
         _emit(
             on_progress,
             "info",
@@ -92,10 +103,14 @@ def discover_contacts_for_company(
         _emit(on_progress, "info", "Reading pages already saved for this company…")
         _ingest_existing_snapshots(session, company, result, on_progress=on_progress)
 
-        total = len(urls)
-        for idx, url in enumerate(urls, start=1):
+        queued = list(urls)
+        seen_urls = {u.casefold().rstrip("/") for u in queued}
+        idx = 0
+        while idx < len(queued) and idx < plan_cap:
+            url = queued[idx]
+            idx += 1
             result.urls_tried += 1
-            _emit(on_progress, "info", f"Looking [{idx}/{total}] {url}")
+            _emit(on_progress, "info", f"Looking [{idx}/{min(len(queued), plan_cap)}] {url}")
             try:
                 assert_fetch_allowed(url)
                 assert_public_http_url(url)
@@ -114,10 +129,6 @@ def discover_contacts_for_company(
                 meta = latest.metadata_json or {}
                 etag = meta.get("etag")
                 last_modified = meta.get("last_modified")
-                if not refresh and latest.text:
-                    # Already ingested via _ingest_existing_snapshots; skip re-fetch
-                    # unless content may have changed (always try conditional GET).
-                    pass
 
             try:
                 _emit(on_progress, "info", f"Fetching {url}")
@@ -161,18 +172,29 @@ def discover_contacts_for_company(
                     found = (result.people_created + result.people_enriched) - before
                     if found:
                         _emit(on_progress, "ok", f"Found {found} contact hit(s) on {url}")
+                    # Second pass: harvest team links from known page text.
+                    _enqueue_harvested(
+                        queued,
+                        seen_urls,
+                        text=latest.text or "",
+                        base_url=company_base_url(company),
+                        on_progress=on_progress,
+                        plan_cap=plan_cap,
+                    )
                 continue
 
             result.urls_fetched += 1
             _emit(on_progress, "info", f"Extracting contacts from {url}")
             snapshot = _persist_snapshot(session, company, fetch, previous_hash=previous_hash)
+            page_text = ""
             if snapshot and fetch.extracted:
+                page_text = fetch.extracted.text or ""
                 before = result.people_created + result.people_enriched
                 _apply_text(
                     session,
                     company,
                     snapshot.url,
-                    fetch.extracted.text,
+                    page_text,
                     snapshot=snapshot,
                     result=result,
                 )
@@ -181,6 +203,15 @@ def discover_contacts_for_company(
                     _emit(on_progress, "ok", f"Found {found} contact hit(s) on {url}")
                 else:
                     _emit(on_progress, "info", f"No named contacts on {url}")
+            if page_text:
+                _enqueue_harvested(
+                    queued,
+                    seen_urls,
+                    text=page_text,
+                    base_url=company_base_url(company),
+                    on_progress=on_progress,
+                    plan_cap=plan_cap,
+                )
     finally:
         if owns_fetcher:
             fetcher.close()
@@ -194,6 +225,32 @@ def discover_contacts_for_company(
     _emit(on_progress, "ok", result.message)
     session.flush()
     return result
+
+
+def _enqueue_harvested(
+    queued: list[str],
+    seen_urls: set[str],
+    *,
+    text: str,
+    base_url: str,
+    on_progress: ProgressFn | None,
+    plan_cap: int,
+) -> None:
+    """Append newly discovered team/about links for a second-pass fetch."""
+    if len(queued) >= plan_cap:
+        return
+    added = 0
+    for link in harvest_people_links_from_text(text, base_url=base_url):
+        key = link.casefold().rstrip("/")
+        if key in seen_urls:
+            continue
+        seen_urls.add(key)
+        queued.append(link)
+        added += 1
+        if len(queued) >= plan_cap:
+            break
+    if added:
+        _emit(on_progress, "info", f"Queued {added} more team/about page(s) from links")
 
 
 def _emit_findings_summary(

@@ -156,6 +156,46 @@ def test_reject_guessed_email_pattern() -> None:
     assert people[0].public_email == "alice.wonder@acme-contacts.example"
 
 
+def test_extract_alternate_person_patterns() -> None:
+    text = """
+    Dana Lee (CEO)
+    dana@acme-contacts.example
+
+    CTO: Evan Park
+    evan@acme-contacts.example
+
+    Fay Quinn
+    Head of Engineering
+    """
+    people = extract_people_from_text(text, company_domain="acme-contacts.example")
+    by_name = {p.name: p for p in people}
+    assert "Dana Lee" in by_name
+    assert "ceo" in by_name["Dana Lee"].role.casefold()
+    assert by_name["Dana Lee"].public_email == "dana@acme-contacts.example"
+    assert "Evan Park" in by_name
+    assert "Fay Quinn" in by_name
+    assert "engineering" in by_name["Fay Quinn"].role.casefold()
+
+
+def test_candidate_urls_include_homepage_and_founders() -> None:
+    from app.services.contacts.pages import candidate_people_urls
+
+    company = Company(
+        name="Acme",
+        domain="acme-contacts.example",
+        industry="Logistics",
+        size_hint="medium",
+        description="x",
+        status="researched",
+        seed_url="https://acme-contacts.example/",
+    )
+    urls = candidate_people_urls(company, [])
+    joined = " ".join(urls).casefold()
+    assert "acme-contacts.example/" in joined or joined.endswith("acme-contacts.example")
+    assert "/founders" in joined or "/team" in joined
+    assert "/impressum" in joined or "/contact" in joined
+
+
 def test_upsert_dedupes_and_enriches(session: Session) -> None:
     company = _company(session)
     snap = _snapshot(

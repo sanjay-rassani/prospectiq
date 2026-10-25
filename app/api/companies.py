@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.config import get_settings
 from app.db.session import SessionLocal, get_session
-from app.models import Company, FeedEntry, SourceFeed, SourceSnapshot
+from app.jobs.queue import enqueue_job
+from app.models import Company, FeedEntry, JobType, Person, SourceFeed, SourceSnapshot
 from app.models.lead import DiscoveryLead, LeadStatus
 from app.services.buyers.capture import add_manual_person
 from app.services.contacts.ssrf import is_safe_public_http_url
@@ -136,6 +137,7 @@ def discover_page(request: Request, session: SessionDep) -> HTMLResponse:
             DiscoveryLead.status != LeadStatus.REJECTED.value
         )
     leads = list(session.scalars(lead_stmt.limit(100)).all())
+    lead_contacts = _contacts_by_company_for_leads(session, leads)
     discovery_runs = list_discovery_runs(session, limit=12)
     lead_counts = dict(
         session.execute(
@@ -169,6 +171,7 @@ def discover_page(request: Request, session: SessionDep) -> HTMLResponse:
             "feeds": feeds,
             "recent": recent,
             "leads": leads,
+            "lead_contacts": lead_contacts,
             "discovery_runs": discovery_runs,
             "lead_counts": lead_counts,
             "intent_filter": intent_filter,
@@ -507,6 +510,42 @@ def discover_add_feed(
     )
 
 
+def _contacts_by_company_for_leads(
+    session: Session, leads: list[DiscoveryLead]
+) -> dict[str, dict[str, Any]]:
+    """Map company_id → {count, people[{id,name,role,email}]} for Discover table."""
+    company_ids = {lead.company_id for lead in leads if lead.company_id}
+    if not company_ids:
+        return {}
+    people = list(
+        session.scalars(
+            select(Person)
+            .where(
+                Person.company_id.in_(company_ids),
+                Person.archived_at.is_(None),
+            )
+            .order_by(Person.quality_score.desc().nullslast(), Person.name.asc())
+        ).all()
+    )
+    out: dict[str, dict[str, Any]] = {
+        str(cid): {"count": 0, "people": []} for cid in company_ids
+    }
+    for person in people:
+        key = str(person.company_id)
+        bucket = out.setdefault(key, {"count": 0, "people": []})
+        bucket["count"] += 1
+        if len(bucket["people"]) < 3:
+            bucket["people"].append(
+                {
+                    "id": str(person.id),
+                    "name": person.name,
+                    "role": person.role,
+                    "email": person.public_email,
+                }
+            )
+    return out
+
+
 def _apply_lead_qualify(lead: DiscoveryLead) -> None:
     lead.status = LeadStatus.QUALIFIED.value
 
@@ -589,6 +628,48 @@ def lead_save(session: SessionDep, lead_id: UUID) -> RedirectResponse:
         )
     return RedirectResponse(
         url="/companies/discover?flash=Could not save company", status_code=303
+    )
+
+
+@router.post("/leads/{lead_id}/find-contacts")
+def lead_find_contacts(session: SessionDep, lead_id: UUID) -> RedirectResponse:
+    """Save/seed the company if needed, then queue public-page contact discovery."""
+    lead = session.get(DiscoveryLead, lead_id)
+    if lead is None:
+        return RedirectResponse(url="/companies/discover?flash=Lead not found", status_code=303)
+
+    if lead.company_id is None:
+        domain = company_domain_from_lead(lead)
+        if not domain:
+            return RedirectResponse(
+                url=(
+                    "/companies/discover?flash="
+                    "No company website on this listing — seed a URL first"
+                ),
+                status_code=303,
+            )
+        outcome = _apply_lead_save(session, lead)
+        session.flush()
+        if outcome != "saved" or lead.company_id is None:
+            return RedirectResponse(
+                url="/companies/discover?flash=Could not save company for contact scan",
+                status_code=303,
+            )
+
+    enqueue_job(
+        session,
+        JobType.DISCOVER_CONTACTS.value,
+        entity_id=lead.company_id,
+        payload={"refresh": True, "from_lead_id": str(lead.id)},
+        dedupe_pending=True,
+    )
+    session.flush()
+    return RedirectResponse(
+        url=(
+            "/companies/discover?flash="
+            "Contact scan queued — scans about/team/contact pages on the company site"
+        ),
+        status_code=303,
     )
 
 

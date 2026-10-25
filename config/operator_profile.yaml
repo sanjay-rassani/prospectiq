@@ -84,14 +84,21 @@ outreach:
   scheduler_enabled: true
   scheduler_tick_seconds: 60
 discovery:
-  focus_preset: custom
-  keywords: &id001 []
+  focus_preset: ai_software
+  keywords: &id001
+  - saas
+  - software
+  - AI automation
+  - agentic AI
+  - API
+  - integrations
+  - RAG
+  - data platform
   optional_keywords: *id001
   exclude_keywords:
   - hiring
   - careers
   - jobs
-  - recruiting
   required_keywords: []
   use_profile_industries_as_keywords: false
   skip_social_hosts: true
@@ -140,9 +147,8 @@ discovery:
   - remote
   include_remote: true
   min_relevance: 30
-  max_age_days: 90
+  max_age_days: 7
   enabled_sources:
-  - hackernews
   - searxng
   - custom_sources
   - rss_feeds

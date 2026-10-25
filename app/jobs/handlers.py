@@ -187,10 +187,13 @@ def _handle_discover_contacts(session: Session, job: Job) -> str:
     if job.entity_id is None:
         raise ValueError("discover_contacts requires entity_id (company id)")
     payload = job.payload_json or {}
+    # Preserve max_urls=0 (snapshot-only). `or 12` would wrongly treat 0 as missing.
+    raw_max = payload.get("max_urls", 12)
+    max_urls = 12 if raw_max is None else int(raw_max)
     result = discover_contacts_for_company(
         session,
         job.entity_id,
-        max_urls=int(payload.get("max_urls") or 12),
+        max_urls=max_urls,
         refresh=bool(payload.get("refresh")),
     )
     # Missing about/team pages is a normal empty result, not a hard job failure.
