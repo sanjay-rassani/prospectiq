@@ -198,6 +198,76 @@ tests/
 
 ---
 
+## Stack & why
+
+Core web framework pieces (FastAPI, Uvicorn, SQLAlchemy, Pydantic, Jinja2, Postgres)
+are assumed. Everything below is a deliberate pick — including third-party public
+APIs and optional self-hosted services. Rule of thumb: **no paid APIs, no SSPL/BSL
+deps, UI works offline.**
+
+### Runtime & packaging
+
+| Tech | What it is | Why we use it |
+| --- | --- | --- |
+| **[uv](https://docs.astral.sh/uv/)** | Fast Python package/env manager from Astral | Pins **Python 3.12** (not system 3.14) so wheels for `lxml` / optional Playwright stay available; one command to recreate the env. |
+| **[hatchling](https://hatch.pypa.io/)** | PEP 517 build backend | Lightweight packaging for `uv pip install -e ".[dev]"` without a heavy setuptools layout. |
+| **Docker Compose** | Runs companion services on localhost | Isolates **Postgres** and optional **SearXNG**; Ollama stays on the host for direct CPU access. |
+| **Postgres 17 (Alpine image)** | Relational database in Docker | Durable store for companies, snapshots, jobs, LLM audit rows; bound to `127.0.0.1` only. |
+| **[psycopg](https://www.psycopg.org/) 3** | Modern Postgres driver | Actively maintained successor to psycopg2; first-class SQLAlchemy 2.x support. |
+| **[Alembic](https://alembic.sqlalchemy.org/)** | Schema migration tool | Versioned DB changes; URL comes from app config so migrations never target a different DB than the app. |
+| **[APScheduler](https://apscheduler.readthedocs.io/) 3.x** | In-process job scheduler | Drains Postgres `Job` rows on a tick without Redis/Celery. Pinned to 3.x for API stability. |
+
+### Local LLMs (host, not Docker)
+
+| Tech | What it is | Why we use it |
+| --- | --- | --- |
+| **[Ollama](https://ollama.com/)** | Local model runner (HTTP API on `:11434`) | Free, offline inference; no cloud LLM bills. Models need host CPU/RAM, so Ollama is not containerized. |
+| **[NuExtract3](https://huggingface.co/numind/NuExtract-2.0-4B)** (`numind/nuextract3:q4_k_m`) | Extraction-specialist model (Apache-2.0) | Turns page text into facts/signals via NuExtract’s **template protocol** (not a free-form chat prompt). `verbatim-string` fields push the “evidence or it doesn’t exist” rule into the model. |
+| **[Qwen3.5](https://ollama.com/library/qwen3.5)** (`qwen3.5:4b`) | Small general instruct model | Drafts opportunity hypotheses and outreach; constrained JSON via Ollama’s `format`. Separate from extraction so each model does one job. |
+
+Context is capped (`LLM_NUM_CTX=8192`) so the KV cache fits typical RAM; every call is persisted in `llm_calls` for auditability.
+
+### Fetching, parsing & change detection
+
+| Tech | What it is | Why we use it |
+| --- | --- | --- |
+| **[httpx](https://www.python-httpx.org/)** | HTTP client | Fetches public pages with timeouts, politeness delays, robots.txt checks, and easy mock transports in tests. |
+| **[trafilatura](https://trafilatura.readthedocs.io/)** | HTML → main-text extractor | Maintained alternative to readability; also yields `published_at`. We **hash extracted text** (not raw HTML) so chrome churn doesn’t fake “page changed.” |
+| **[feedparser](https://feedparser.readthedocs.io/)** | RSS/Atom parser | Polls operator-added feeds and GitHub `releases.atom` as a supplementary discovery source. |
+| **[Playwright](https://playwright.dev/python/)** (optional) | Headless browser | Per-domain opt-in fallback when plain HTTP can’t get useful HTML (JS-heavy sites). Off by default; not required to run the app. |
+
+### UI (vendored — no CDN)
+
+| Tech | What it is | Why we use it |
+| --- | --- | --- |
+| **[Pico.css](https://picocss.com/)** | Class-light CSS framework | Sensible defaults for a single-operator tool without building a design system. Copied into `app/static` so the UI works with no internet. |
+| **[HTMX](https://htmx.org/)** | Small JS library for HTML-over-the-wire | Vendored for the same offline / no-third-party-service rule; progressive enhancement without an SPA. |
+| **SSE (`EventSource`)** | Browser API for server-sent events | Live progress logs on Discover and contact scans — long CPU/LLM work must not sit inside a normal form POST. |
+
+### Lead discovery sources (third-party / public)
+
+| Tech | What it is | Why we use it |
+| --- | --- | --- |
+| **Hacker News via [Algolia HN API](https://hn.algolia.com/api)** | Public, keyless search over HN | Finds Ask HN / hiring-builder style intent posts without scraping HTML or paying for search. |
+| **[UK Contracts Finder](https://www.contractsfinder.service.gov.uk/)** (OCDS search) | UK gov procurement notices API | Free public tenders as high-intent project leads; no API key. |
+| **[SearXNG](https://docs.searxng.org/)** | Self-hosted metasearch (JSON API) | Optional web research without scraping Google HTML or using paid SERP APIs. Prefer the Compose service on `:8080`; can also fail over to community instances listed on [searx.space](https://searx.space/). |
+| **GitHub public API** (issues search) | Optional, rate-limited | Finds public “help wanted” / project signals; `GITHUB_TOKEN` recommended only for higher limits — still free. |
+
+**Not used (by design):** paid enrichment, LinkedIn/Google HTML scrapers, Upwork/Fiverr search (import a listing URL via Seed only).
+
+### Dev quality & ops
+
+| Tech | What it is | Why we use it |
+| --- | --- | --- |
+| **[pytest](https://docs.pytest.org/)** | Test runner | Acceptance-style coverage (hash skip, fetcher, scoring) without needing Ollama (`LLM_ENABLED` / fake gateway). |
+| **[Ruff](https://docs.astral.sh/ruff/)** | Linter/formatter | Fast, single-tool lint aligned with Astral’s uv toolchain. |
+| **[mypy](https://mypy.readthedocs.io/)** (+ Pydantic plugin) | Static type checker | Catches contract drift on services that talk to LLMs and the DB. |
+| **systemd timers** (`deploy/prospectiq-backup.*`) | Host cron-like scheduling | Optional nightly Postgres dumps via `scripts/backup_pg.sh`. |
+
+Decision detail (IDs D-01…): [`PLAN.md`](PLAN.md).
+
+---
+
 ## Backups & export
 
 ```bash
